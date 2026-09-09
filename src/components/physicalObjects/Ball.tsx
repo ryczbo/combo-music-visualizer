@@ -4,21 +4,39 @@ import type { BallProps } from "../../constants/physicalObjectsProperties";
 import type { AudioEngine } from "../../services/audioEngine";
 
 type BallComponentProps = BallProps & {
+  started: boolean;
   audioEngine: AudioEngine;
 };
 
-export function Ball({ note, position, color, audioEngine }: BallComponentProps) {
+export function Ball({
+  note,
+  boxPosition,
+  color,
+  linearVelocity,
+  started,
+  audioEngine,
+}: BallComponentProps) {
   const rigidBody = useRef<RapierRigidBody>(null);
   const lastCollisionTime = useRef(0);
 
   return (
     <RigidBody
       ref={rigidBody}
-      position={position}
-      restitution={0.9}
-      friction={0.3}
+      position={boxPosition}
+      linearVelocity={started ? linearVelocity : [0, 0, 0]}
+      restitution={0.3}
+      friction={0}
+      linearDamping={0}
+      angularDamping={0}
       onCollisionEnter={({ other }) => {
-        if (other.rigidBodyObject?.name !== "floor") return;
+        const surfaceName = other.rigidBodyObject?.name ?? "";
+        if (surfaceName !== "floor" && !surfaceName.startsWith("stair-")) {
+          return;
+        }
+
+        if (surfaceName.startsWith("stair-")) {
+          rigidBody.current?.applyImpulse({ x: 0, y: 0, z: 0.1 }, true);
+        }
 
         const now = performance.now();
         if (now - lastCollisionTime.current < 180) return;

@@ -1,6 +1,7 @@
 import { NOTE_FREQUENCIES, VOICES_PER_NOTE } from "../constants/notes";
 
 export class AudioEngine {
+  // The context is created lazily from the user's Start/Drop gesture.
   private context: AudioContext | null = null;
 
   private masterGain: GainNode | null = null;
@@ -21,9 +22,12 @@ export class AudioEngine {
   async initialize() {
     if (this.initialized) return;
 
+    // Interactive latency is preferable here because collisions are immediate
+    // events rather than a long-form music stream.
     this.context = new AudioContext({ latencyHint: "interactive" });
 
-    // Master output
+    // Route all voices through a gain stage, compressor, makeup gain, and final
+    // limiter so many simultaneous impacts remain loud without clipping.
     this.masterGain = this.context.createGain();
     this.masterGain.gain.value = 0.8;
     this.compressor = this.context.createDynamicsCompressor();
@@ -61,6 +65,7 @@ export class AudioEngine {
       await this.context.resume();
     }
 
+    // Construct every persistent oscillator before the first ball is released.
     this.prewarmNotes();
   }
 
@@ -80,6 +85,8 @@ export class AudioEngine {
 
         oscillator.type = "sine";
         oscillator.frequency.setValueAtTime(frequency, startTime);
+        // Run a silent warmup envelope so the first real collision does not pay
+        // the browser's audio graph activation cost.
         gain.gain.setValueAtTime(0.0001, startTime);
         gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.05);
         gain.gain.setValueAtTime(0, startTime + 0.05);
@@ -114,6 +121,7 @@ export class AudioEngine {
       return;
     }
 
+    // Round-robin voices preserve overlapping impacts of the same note.
     const cursor = this.voiceCursors.get(note) ?? 0;
     const voice = noteVoices[cursor];
     this.voiceCursors.set(note, (cursor + 1) % noteVoices.length);
@@ -122,6 +130,7 @@ export class AudioEngine {
     const gain = voice.gain.gain;
     const attackTime = now + 0.008;
 
+    // Fade briefly before retriggering to avoid clicks when a voice is reused.
     gain.cancelScheduledValues(now);
     gain.setValueAtTime(Math.max(gain.value, 0.0001), now);
     gain.exponentialRampToValueAtTime(0.0001, attackTime);
@@ -135,6 +144,7 @@ export class AudioEngine {
       0.0001,
       attackTime + 0.5
     );
+    // End at exact zero so persistent oscillators do not leave a quiet drone.
     gain.setValueAtTime(0, attackTime + 0.5);
   }
 }

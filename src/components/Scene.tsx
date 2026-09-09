@@ -1,18 +1,17 @@
 import { OrbitControls } from "@react-three/drei";
-import { Physics } from "@react-three/rapier";
 import { AudioEngine } from "../services/audioEngine";
-import { BALLS } from "../constants/physicalObjectsProperties";
-import { Ball } from "./physicalObjects/Ball";
-import { Floor } from "./physicalObjects/Floor";
+import { Wheel } from "./Wheel";
 
 type SceneProps = {
-  dropCount: number;
+  started: boolean;
   audioEngine: AudioEngine;
+  randomizeKey: number;
 };
 
-export function Scene({ dropCount, audioEngine }: SceneProps) {
+export function Scene({ started, audioEngine, randomizeKey }: SceneProps) {
   return (
     <>
+      {/* Lighting is kept outside the physics world because it is visual only. */}
       <ambientLight intensity={0.5} />
 
       <directionalLight
@@ -23,23 +22,13 @@ export function Scene({ dropCount, audioEngine }: SceneProps) {
         shadow-mapSize-height={2048}
       />
 
-      <Physics gravity={[0, -8.81, 0]}>
-        {dropCount > 0 && (
-          <>
-            {BALLS.map((ball, index) => (
-              <Ball
-                key={`${dropCount}-${index}`}
-                {...ball}
-                audioEngine={audioEngine}
-              />
-            ))}
-          </>
-        )}
+      <Wheel
+        started={started}
+        audioEngine={audioEngine}
+        randomizeKey={randomizeKey}
+      />
 
-        <Floor />
-      </Physics>
-
-      <OrbitControls />
+      <OrbitControls target={[0, 0, 0]} enablePan={false} />
     </>
   );
 }

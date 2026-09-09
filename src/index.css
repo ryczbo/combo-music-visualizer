@@ -1,3 +1,4 @@
+/* Make the canvas fill the viewport and prevent page scrolling around it. */
 html,
 body,
 #root {
@@ -8,5 +9,6 @@ body,
 }
 
 body {
+  /* Keep the fallback font limited to the document shell. */
   font-family: sans-serif;
 }

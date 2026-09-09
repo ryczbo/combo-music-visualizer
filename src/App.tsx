@@ -1,31 +1,21 @@
 import { useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { AudioEngine } from "./services/audioEngine";
 import { Scene } from "./components/Scene";
+import { AudioEngine } from "./services/audioEngine";
 
 const audioEngine = new AudioEngine();
 
 export default function App() {
-  const [dropCount, setDropCount] = useState(0);
-
-  const drop = async () => {
-    try {
-      if (dropCount === 0) {
-        await audioEngine.start();
-      }
-      setDropCount((count) => count + 1);
-    } catch (error) {
-      console.error("Failed to start audio:", error);
-    }
-  };
+  const [started, setStarted] = useState(false);
+  const [randomizeKey, setRandomizeKey] = useState(0);
 
   return (
     <>
       <Canvas
         shadows
         camera={{
-          position: [17.7, 8.5, 0.06],
-          fov: 60,
+          position: [0, 0, 18],
+          fov: 45,
         }}
         style={{
           width: "100vw",
@@ -33,11 +23,16 @@ export default function App() {
           background: "#111111",
         }}
       >
-        <Scene dropCount={dropCount} audioEngine={audioEngine} />
+        <Scene
+          started={started}
+          audioEngine={audioEngine}
+          randomizeKey={randomizeKey}
+        />
       </Canvas>
 
       <div
         style={{
+          // Keep the start control on the right side of the viewport.
           position: "fixed",
           top: "20px",
           left: "50%",
@@ -46,7 +41,14 @@ export default function App() {
         }}
       >
         <button
-          onClick={drop}
+          onClick={async () => {
+            if (!started) {
+              await audioEngine.start();
+              setStarted(true);
+            } else {
+              setRandomizeKey((key) => key + 1);
+            }
+          }}
           style={{
             padding: "15px 35px",
             fontSize: "18px",
@@ -55,7 +57,7 @@ export default function App() {
             cursor: "pointer",
           }}
         >
-          {dropCount === 0 ? "Start" : "Drop"}
+          {started ? "Randomize" : "Start"}
         </button>
       </div>
     </>
