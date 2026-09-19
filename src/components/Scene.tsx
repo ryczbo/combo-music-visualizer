@@ -3,12 +3,22 @@ import { AudioEngine } from "../services/audioEngine";
 import { Wheel } from "./Wheel";
 
 type SceneProps = {
-  started: boolean;
+  activeAxes: Record<"x" | "y" | "z", boolean>;
+  axisDirections: Record<"x" | "y" | "z", 1 | -1>;
+  axisSpeeds: Record<"x" | "y" | "z", number>;
   audioEngine: AudioEngine;
-  randomizeKey: number;
+  beadCount: number;
+  notes: string[];
 };
 
-export function Scene({ started, audioEngine, randomizeKey }: SceneProps) {
+export function Scene({
+  activeAxes,
+  axisDirections,
+  axisSpeeds,
+  audioEngine,
+  beadCount,
+  notes,
+}: SceneProps) {
   return (
     <>
       {/* Lighting is kept outside the physics world because it is visual only. */}
@@ -23,9 +33,12 @@ export function Scene({ started, audioEngine, randomizeKey }: SceneProps) {
       />
 
       <Wheel
-        started={started}
+        activeAxes={activeAxes}
+        axisDirections={axisDirections}
+        axisSpeeds={axisSpeeds}
         audioEngine={audioEngine}
-        randomizeKey={randomizeKey}
+        beadCount={beadCount}
+        notes={notes}
       />
 
       <OrbitControls target={[0, 0, 0]} enablePan={false} />

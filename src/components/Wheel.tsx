@@ -1,13 +1,15 @@
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, type RefObject } from "react";
 import * as THREE from "three";
-import { NOTE_FREQUENCIES } from "../constants/notes";
 import { AudioEngine } from "../services/audioEngine";
 
 type WheelProps = {
-  started: boolean;
+  activeAxes: Record<"x" | "y" | "z", boolean>;
+  axisDirections: Record<"x" | "y" | "z", 1 | -1>;
+  axisSpeeds: Record<"x" | "y" | "z", number>;
   audioEngine: AudioEngine;
-  randomizeKey: number;
+  beadCount: number;
+  notes: string[];
 };
 
 type SpokeBeadProps = {
@@ -18,6 +20,7 @@ type SpokeBeadProps = {
   note: string;
   audioEngine: AudioEngine;
   beadIndex: number;
+  suppressSoundsUntil: RefObject<number>;
   onStateChange: (
     index: number,
     distance: number,
@@ -30,26 +33,14 @@ const WHEEL_RADIUS = 4;
 const SPOKE_START = 0.35;
 const SPOKE_LENGTH = WHEEL_RADIUS - 0.7;
 const BEAD_RADIUS = 0.16;
-const BEAD_COUNT = 6;
 
 const shuffledSpokes = Array.from({ length: SPOKE_COUNT }, (_, index) => index)
-  .sort(() => Math.random() - 0.5)
-  .slice(0, BEAD_COUNT);
-const beadNotes = Object.keys(NOTE_FREQUENCIES);
-
-function seededRandom(seed: number) {
-  const value = Math.sin(seed * 12.9898) * 43758.5453;
-  return value - Math.floor(value);
-}
-
-function getRandomSpokes(count: number, seed: number) {
-  return Array.from({ length: SPOKE_COUNT }, (_, index) => index)
-    .sort(
-      (first, second) =>
-        seededRandom(seed + first * 17.23) -
-        seededRandom(seed + second * 17.23)
-    )
-    .slice(0, count);
+  .sort(() => Math.random() - 0.5);
+function getBeadColor(index: number) {
+  const hue = (index * 137.508 + 24) % 360;
+  const saturation = 72 + (index % 3) * 8;
+  const lightness = 52 + (index % 4) * 5;
+  return `hsl(${hue} ${saturation}% ${lightness}%)`;
 }
 
 function SpokeBead({
@@ -60,6 +51,7 @@ function SpokeBead({
   note,
   audioEngine,
   beadIndex,
+  suppressSoundsUntil,
   onStateChange,
 }: SpokeBeadProps) {
   const bead = useRef<THREE.Mesh>(null);
@@ -70,9 +62,11 @@ function SpokeBead({
   useFrame((_, delta) => {
     if (!bead.current) return;
 
-    const wheelAngle = wheel.current?.rotation.z ?? 0;
-    const radialY = Math.cos(wheelAngle + spokeAngle);
-    velocity.current += -9.81 * radialY * delta;
+    const radialDirection = new THREE.Vector3(0, 1, 0)
+      .applyAxisAngle(new THREE.Vector3(0, 0, 1), spokeAngle)
+      .applyQuaternion(wheel.current?.quaternion ?? new THREE.Quaternion());
+    const gravity = new THREE.Vector3(0, -9.81, 0);
+    velocity.current += gravity.dot(radialDirection) * delta;
     velocity.current *= Math.exp(-1.8 * delta);
     const previousDistance = distance.current;
     distance.current += velocity.current * delta;
@@ -101,14 +95,22 @@ function SpokeBead({
     if (distance.current < minDistance) {
       distance.current = minDistance;
       velocity.current = Math.abs(velocity.current) * 0.45;
-      if (hitHub && currentTime - lastImpactTime.current > 120) {
+      if (
+        hitHub &&
+        currentTime > suppressSoundsUntil.current &&
+        currentTime - lastImpactTime.current > 120
+      ) {
         audioEngine.playNote(note, 0.35);
         lastImpactTime.current = currentTime;
       }
     } else if (distance.current > maxDistance) {
       distance.current = maxDistance;
       velocity.current = -Math.abs(velocity.current) * 0.45;
-      if (hitRim && currentTime - lastImpactTime.current > 120) {
+      if (
+        hitRim &&
+        currentTime > suppressSoundsUntil.current &&
+        currentTime - lastImpactTime.current > 120
+      ) {
         audioEngine.playNote(note, 0.35);
         lastImpactTime.current = currentTime;
       }
@@ -127,29 +129,29 @@ function SpokeBead({
   );
 }
 
-export function Wheel({ started, audioEngine, randomizeKey }: WheelProps) {
+export function Wheel({
+  activeAxes,
+  axisDirections,
+  axisSpeeds,
+  audioEngine,
+  beadCount,
+  notes,
+}: WheelProps) {
   const wheel = useRef<THREE.Group>(null);
   const spokeIndices = useMemo(
-    () => {
-      if (randomizeKey === 0) return shuffledSpokes;
-
-      const randomBeadCount =
-        1 + Math.floor(seededRandom(randomizeKey) * SPOKE_COUNT);
-      return getRandomSpokes(randomBeadCount, randomizeKey);
-    },
-    [randomizeKey]
+    () => shuffledSpokes.slice(0, beadCount),
+    [beadCount]
   );
   const beadStates = useRef<Array<{ distance: number; velocity: number; spoke: number }>>([]);
   const beadCollisionTimes = useRef(new Map<string, number>());
   const pendingStates = useRef(
     new Map<number, { distance: number; velocity: number }>()
   );
+  const suppressSoundsUntil = useRef(0);
 
   useEffect(() => {
-    beadStates.current = [];
-    pendingStates.current.clear();
-    beadCollisionTimes.current.clear();
-  }, [randomizeKey]);
+    suppressSoundsUntil.current = performance.now() + 180;
+  }, [axisSpeeds]);
 
   const handleBeadState = (
     index: number,
@@ -175,8 +177,11 @@ export function Wheel({ started, audioEngine, randomizeKey }: WheelProps) {
       const pairKey = [index, otherIndex].sort().join(":");
       const now = performance.now();
       const lastCollision = beadCollisionTimes.current.get(pairKey) ?? -Infinity;
-      if (now - lastCollision > 120) {
-        audioEngine.playNote(beadNotes[index % beadNotes.length], 0.3);
+      if (
+        now > suppressSoundsUntil.current &&
+        now - lastCollision > 120
+      ) {
+        audioEngine.playNote(notes[index % notes.length], 0.3);
         beadCollisionTimes.current.set(pairKey, now);
         const midpoint = (state.distance + other.distance) / 2;
         const separation = BEAD_RADIUS;
@@ -227,8 +232,13 @@ export function Wheel({ started, audioEngine, randomizeKey }: WheelProps) {
   };
 
   useFrame((_, delta) => {
-    if (started && wheel.current) {
-      wheel.current.rotation.z -= delta * 0.7;
+    if (wheel.current) {
+      for (const axis of ["x", "y", "z"] as const) {
+        if (activeAxes[axis]) {
+          wheel.current.rotation[axis] +=
+            delta * axisSpeeds[axis] * 0.1 * axisDirections[axis];
+        }
+      }
     }
   });
 
@@ -258,14 +268,15 @@ export function Wheel({ started, audioEngine, randomizeKey }: WheelProps) {
 
       {spokeIndices.map((spokeIndex, index) => (
         <SpokeBead
-          key={`${randomizeKey}-${index}`}
+          key={index}
           wheel={wheel}
           spokeAngle={(spokeIndex / SPOKE_COUNT) * Math.PI * 2}
           initialDistance={2.1 + index * 0.45}
-          color={["#ffb52e", "#4fe3c1", "#ff6b9d", "#a78bfa", "#fb7185", "#facc15"][index]}
-          note={beadNotes[index % beadNotes.length]}
+          color={getBeadColor(index)}
+          note={notes[index % notes.length]}
           audioEngine={audioEngine}
           beadIndex={index}
+          suppressSoundsUntil={suppressSoundsUntil}
           onStateChange={handleBeadState}
         />
       ))}
