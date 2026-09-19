@@ -30,6 +30,7 @@ export default function App() {
   const [filterFrequency, setFilterFrequency] = useState(12000);
   const [lfoType, setLfoType] = useState<OscillatorType>("sine");
   const [lfoRate, setLfoRate] = useState(0);
+  const [controlsVisible, setControlsVisible] = useState(true);
 
   const toggleAxis = async (axis: "x" | "y" | "z") => {
     if (!activeAxes[axis]) {
@@ -132,12 +133,41 @@ export default function App() {
         />
       </Canvas>
 
-      <div
+      <button
+        onClick={() => setControlsVisible((visible) => !visible)}
+        aria-label="Toggle wheel controls"
         style={{
           position: "fixed",
           top: "20px",
           left: "20px",
+          width: "40px",
+          height: "40px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "4px",
+          background: "rgba(17, 17, 17, 0.82)",
+          border: "1px solid rgba(255, 255, 255, 0.2)",
+          borderRadius: "8px",
+          cursor: "pointer",
+          zIndex: 2,
+        }}
+      >
+        <span style={{ width: "18px", height: "2px", background: "white" }} />
+        <span style={{ width: "18px", height: "2px", background: "white" }} />
+        <span style={{ width: "18px", height: "2px", background: "white" }} />
+      </button>
+
+      {controlsVisible && (
+      <div
+        style={{
+          position: "fixed",
+          top: "70px",
+          left: "20px",
           width: "220px",
+          maxHeight: "calc(100vh - 90px)",
+          overflowY: "auto",
           padding: "16px",
           display: "flex",
           flexDirection: "column",
@@ -219,6 +249,13 @@ export default function App() {
             <option value="eMinorPentatonic">E minor pentatonic</option>
             <option value="cMajor">C major</option>
             <option value="eMajor">E major</option>
+            <option value="aMinor">A minor</option>
+            <option value="aHarmonicMinor">A harmonic minor</option>
+            <option value="dDorian">D dorian</option>
+            <option value="cBluesMinor">C blues minor</option>
+            <option value="gMixolydian">G mixolydian</option>
+            <option value="hirajoshi">Hirajoshi</option>
+            <option value="wholeTone">Whole tone</option>
           </select>
         </label>
         <label>
@@ -354,6 +391,7 @@ export default function App() {
           />
         </label>
       </div>
+      )}
     </>
   );
 }

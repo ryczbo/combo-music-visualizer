@@ -16,11 +16,12 @@ type SpokeBeadProps = {
   wheel: RefObject<THREE.Group | null>;
   spokeAngle: number;
   initialDistance: number;
-  color: string;
   note: string;
   audioEngine: AudioEngine;
   beadIndex: number;
   suppressSoundsUntil: RefObject<number>;
+  onHubHit: (beadIndex: number) => void;
+  onRimHit: (beadIndex: number) => void;
   onStateChange: (
     index: number,
     distance: number,
@@ -36,25 +37,22 @@ const BEAD_RADIUS = 0.16;
 
 const shuffledSpokes = Array.from({ length: SPOKE_COUNT }, (_, index) => index)
   .sort(() => Math.random() - 0.5);
-function getBeadColor(index: number) {
-  const hue = (index * 137.508 + 24) % 360;
-  const saturation = 72 + (index % 3) * 8;
-  const lightness = 52 + (index % 4) * 5;
-  return `hsl(${hue} ${saturation}% ${lightness}%)`;
-}
 
 function SpokeBead({
   wheel,
   spokeAngle,
   initialDistance,
-  color,
   note,
   audioEngine,
   beadIndex,
   suppressSoundsUntil,
+  onHubHit,
+  onRimHit,
   onStateChange,
 }: SpokeBeadProps) {
   const bead = useRef<THREE.Mesh>(null);
+  const beadMaterial = useRef<THREE.MeshStandardMaterial | null>(null);
+  const beadFlash = useRef(0);
   const distance = useRef(initialDistance);
   const velocity = useRef(0);
   const lastImpactTime = useRef(-Infinity);
@@ -95,6 +93,10 @@ function SpokeBead({
     if (distance.current < minDistance) {
       distance.current = minDistance;
       velocity.current = Math.abs(velocity.current) * 0.45;
+      if (hitHub) {
+        onHubHit(beadIndex);
+        beadFlash.current = 1;
+      }
       if (
         hitHub &&
         currentTime > suppressSoundsUntil.current &&
@@ -106,6 +108,10 @@ function SpokeBead({
     } else if (distance.current > maxDistance) {
       distance.current = maxDistance;
       velocity.current = -Math.abs(velocity.current) * 0.45;
+      if (hitRim) {
+        onRimHit(beadIndex);
+        beadFlash.current = 1;
+      }
       if (
         hitRim &&
         currentTime > suppressSoundsUntil.current &&
@@ -117,13 +123,29 @@ function SpokeBead({
     }
 
     bead.current.position.y = distance.current;
+
+    // Fade the bead's own light-up glow back down after a surface hit.
+    beadFlash.current *= Math.exp(-6 * delta);
+    if (beadMaterial.current) {
+      beadMaterial.current.emissiveIntensity = beadFlash.current * 3;
+      beadMaterial.current.opacity = 0.5 + beadFlash.current * 0.4;
+    }
   });
 
   return (
     <group rotation={[0, 0, spokeAngle]}>
       <mesh ref={bead} position={[0, initialDistance, 0.22]}>
         <sphereGeometry args={[BEAD_RADIUS, 20, 20]} />
-        <meshStandardMaterial color={color} roughness={0.25} metalness={0.7} />
+        <meshStandardMaterial
+          ref={beadMaterial}
+          color="#6b5900"
+          emissive="#8a7000"
+          emissiveIntensity={0}
+          transparent
+          opacity={0.5}
+          roughness={0.15}
+          metalness={0.2}
+        />
       </mesh>
     </group>
   );
@@ -148,10 +170,24 @@ export function Wheel({
     new Map<number, { distance: number; velocity: number }>()
   );
   const suppressSoundsUntil = useRef(0);
+  const spokeFlash = useRef(new Float32Array(SPOKE_COUNT));
+  const spokeMaterials = useRef<Array<THREE.MeshStandardMaterial | null>>(
+    new Array(SPOKE_COUNT).fill(null)
+  );
+  const hubFlash = useRef(0);
+  const hubMaterial = useRef<THREE.MeshStandardMaterial | null>(null);
 
   useEffect(() => {
     suppressSoundsUntil.current = performance.now() + 180;
   }, [axisSpeeds]);
+
+  const flashSpoke = (beadIndex: number) => {
+    spokeFlash.current[spokeIndices[beadIndex]] = 1;
+  };
+
+  const flashHub = () => {
+    hubFlash.current = 1;
+  };
 
   const handleBeadState = (
     index: number,
@@ -240,28 +276,60 @@ export function Wheel({
         }
       }
     }
+
+    // Fade lit-up spokes and hub back toward their resting bioluminescent glow.
+    const decay = Math.exp(-6 * delta);
+    for (let index = 0; index < SPOKE_COUNT; index += 1) {
+      spokeFlash.current[index] *= decay;
+      const material = spokeMaterials.current[index];
+      if (material) {
+        material.emissiveIntensity = 0.5 + spokeFlash.current[index] * 4;
+        material.opacity = 0.45 + spokeFlash.current[index] * 0.5;
+      }
+    }
+
+    hubFlash.current *= decay;
+    if (hubMaterial.current) {
+      hubMaterial.current.emissiveIntensity = 0.5 + hubFlash.current * 4;
+    }
   });
 
   return (
     <group ref={wheel}>
+      {/* Thin bioluminescent rim, translucent like a ctenophore's edge. */}
       <mesh>
-        <torusGeometry args={[WHEEL_RADIUS, 0.22, 20, 96]} />
-        <meshStandardMaterial color="#171a1f" roughness={0.45} metalness={0.75} />
+        <torusGeometry args={[WHEEL_RADIUS - 0.28, 0.045, 6, 48]} />
+        <meshStandardMaterial
+          color="#0a1a3c"
+          emissive="#2f6690"
+          emissiveIntensity={0.6}
+          transparent
+          opacity={0.55}
+          roughness={0.35}
+          metalness={0.2}
+        />
       </mesh>
 
-      <mesh>
-        <torusGeometry args={[WHEEL_RADIUS - 0.28, 0.07, 12, 96]} />
-        <meshStandardMaterial color="#c7ced8" roughness={0.25} metalness={0.9} />
-      </mesh>
-
+      {/* Thin dark-blue spokes, lit up individually on impact. */}
       {Array.from({ length: SPOKE_COUNT }, (_, index) => (
         <group
           key={index}
           rotation={[0, 0, (index / SPOKE_COUNT) * Math.PI * 2]}
         >
           <mesh position={[0, SPOKE_START + SPOKE_LENGTH / 2, 0]}>
-            <cylinderGeometry args={[0.035, 0.035, SPOKE_LENGTH, 8]} />
-            <meshStandardMaterial color="#b8c0ca" roughness={0.3} metalness={0.8} />
+            <cylinderGeometry args={[0.02, 0.02, SPOKE_LENGTH, 6]} />
+            <meshStandardMaterial
+              ref={(material) => {
+                spokeMaterials.current[index] = material;
+              }}
+              color="#123a5e"
+              emissive="#1c4f7c"
+              emissiveIntensity={0.5}
+              transparent
+              opacity={0.45}
+              roughness={0.3}
+              metalness={0.1}
+            />
           </mesh>
         </group>
       ))}
@@ -272,23 +340,28 @@ export function Wheel({
           wheel={wheel}
           spokeAngle={(spokeIndex / SPOKE_COUNT) * Math.PI * 2}
           initialDistance={2.1 + index * 0.45}
-          color={getBeadColor(index)}
           note={notes[index % notes.length]}
           audioEngine={audioEngine}
           beadIndex={index}
           suppressSoundsUntil={suppressSoundsUntil}
+          onHubHit={flashHub}
+          onRimHit={flashSpoke}
           onStateChange={handleBeadState}
         />
       ))}
 
       <mesh position={[0, 0, 0.12]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.42, 0.42, 0.3, 32]} />
-        <meshStandardMaterial color="#272c33" roughness={0.3} metalness={0.8} />
-      </mesh>
-
-      <mesh position={[0, 0, 0.3]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.12, 0.12, 0.55, 24]} />
-        <meshStandardMaterial color="#e2e7ed" roughness={0.2} metalness={0.95} />
+        <cylinderGeometry args={[0.42, 0.42, 0.3, 6]} />
+        <meshStandardMaterial
+          ref={hubMaterial}
+          color="#0a1a3c"
+          emissive="#2f6690"
+          emissiveIntensity={0.5}
+          transparent
+          opacity={0.55}
+          roughness={0.35}
+          metalness={0.2}
+        />
       </mesh>
     </group>
   );
