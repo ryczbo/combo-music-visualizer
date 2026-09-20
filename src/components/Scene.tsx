@@ -7,8 +7,9 @@ type SceneProps = {
   axisDirections: Record<"x" | "y" | "z", 1 | -1>;
   axisSpeeds: Record<"x" | "y" | "z", number>;
   audioEngine: AudioEngine;
-  beadCount: number;
-  notes: string[];
+  noteOptions: string[];
+  inflateHeld: boolean;
+  showOuterRing: boolean;
 };
 
 export function Scene({
@@ -16,8 +17,9 @@ export function Scene({
   axisDirections,
   axisSpeeds,
   audioEngine,
-  beadCount,
-  notes,
+  noteOptions,
+  inflateHeld,
+  showOuterRing,
 }: SceneProps) {
   return (
     <>
@@ -37,8 +39,9 @@ export function Scene({
         axisDirections={axisDirections}
         axisSpeeds={axisSpeeds}
         audioEngine={audioEngine}
-        beadCount={beadCount}
-        notes={notes}
+        noteOptions={noteOptions}
+        inflateHeld={inflateHeld}
+        showOuterRing={showOuterRing}
       />
 
       <OrbitControls target={[0, 0, 0]} enablePan={false} />

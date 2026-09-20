@@ -94,6 +94,15 @@ export const SCALES = {
     "G#4": 415.3,
     "A#4": 466.16,
   },
+  indianxD: {
+    Sa: 240.0,
+    Re: 270.0,
+    Ga: 288.0,
+    Ma: 320.0,
+    Pa: 360.0,
+    Dha: 405.0,
+    Ni: 432.0,
+  }
 } satisfies Record<string, Record<string, number>>;
 
 export type ScaleName = keyof typeof SCALES;
@@ -103,3 +112,28 @@ export const NOTE_FREQUENCIES = SCALES.ePhrygianDominant;
 // Multiple voices per note allow simultaneous balls to overlap without
 // cancelling or forcibly restarting one another's gain envelopes.
 export const VOICES_PER_NOTE = 4;
+
+// Adds an octave below and above each note (three octaves total) so pitch
+// pickers can offer a wider range than the scale's base octave.
+export function expandScaleOctaves(
+  scale: Record<string, number>
+): Record<string, number> {
+  const expanded: Record<string, number> = { ...scale };
+
+  for (const [note, frequency] of Object.entries(scale)) {
+    const match = note.match(/^(.*?)(\d+)$/);
+    if (match) {
+      const [, base, octaveText] = match;
+      const octave = Number(octaveText);
+      expanded[`${base}${octave - 1}`] = frequency / 2;
+      expanded[`${base}${octave + 1}`] = frequency * 2;
+    } else {
+      expanded[`${note}3`] = frequency / 2;
+      expanded[`${note}5`] = frequency * 2;
+    }
+  }
+
+  return expanded;
+}
+
+// 

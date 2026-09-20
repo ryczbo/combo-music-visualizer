@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Scene } from "./components/Scene";
 import { AudioEngine } from "./services/audioEngine";
-import { SCALES, type ScaleName } from "./constants/notes";
+import { SCALES, expandScaleOctaves, type ScaleName } from "./constants/notes";
 
 const audioEngine = new AudioEngine();
 
@@ -18,7 +18,6 @@ export default function App() {
     y: 8,
     z: 8,
   });
-  const [beadCount, setBeadCount] = useState(6);
   const [scaleName, setScaleName] = useState<ScaleName>("ePhrygianDominant");
   const [volume, setVolume] = useState(0.8);
   const [tone, setTone] = useState(1);
@@ -31,6 +30,8 @@ export default function App() {
   const [lfoType, setLfoType] = useState<OscillatorType>("sine");
   const [lfoRate, setLfoRate] = useState(0);
   const [controlsVisible, setControlsVisible] = useState(true);
+  const [inflateHeld, setInflateHeld] = useState(false);
+  const [showOuterRing, setShowOuterRing] = useState(true);
 
   const toggleAxis = async (axis: "x" | "y" | "z") => {
     if (!activeAxes[axis]) {
@@ -106,8 +107,17 @@ export default function App() {
 
   const updateScale = (value: ScaleName) => {
     setScaleName(value);
-    audioEngine.setScale(SCALES[value]);
   };
+
+  // Register three octaves of the scale so the sector note picker can offer a
+  // wider range than the single octave used for automatic sector assignment.
+  useEffect(() => {
+    audioEngine.setScale(expandScaleOctaves(SCALES[scaleName]));
+  }, [scaleName]);
+
+  const noteOptions = Object.entries(expandScaleOctaves(SCALES[scaleName]))
+    .sort((a, b) => a[1] - b[1])
+    .map(([note]) => note);
 
   return (
     <>
@@ -128,8 +138,9 @@ export default function App() {
           axisDirections={axisDirections}
           axisSpeeds={axisSpeeds}
           audioEngine={audioEngine}
-          beadCount={beadCount}
-          notes={Object.keys(SCALES[scaleName])}
+          noteOptions={noteOptions}
+          inflateHeld={inflateHeld}
+          showOuterRing={showOuterRing}
         />
       </Canvas>
 
@@ -157,6 +168,49 @@ export default function App() {
         <span style={{ width: "18px", height: "2px", background: "white" }} />
         <span style={{ width: "18px", height: "2px", background: "white" }} />
         <span style={{ width: "18px", height: "2px", background: "white" }} />
+      </button>
+
+      <button
+        onMouseDown={() => setInflateHeld(true)}
+        onMouseUp={() => setInflateHeld(false)}
+        onMouseLeave={() => setInflateHeld(false)}
+        onTouchStart={() => setInflateHeld(true)}
+        onTouchEnd={() => setInflateHeld(false)}
+        style={{
+          position: "fixed",
+          top: "20px",
+          right: "20px",
+          padding: "10px 16px",
+          fontSize: "15px",
+          borderRadius: "8px",
+          border: "1px solid rgba(255, 255, 255, 0.2)",
+          background: "rgba(17, 17, 17, 0.82)",
+          color: "white",
+          cursor: "pointer",
+          opacity: inflateHeld ? 0.6 : 1,
+          zIndex: 2,
+        }}
+      >
+        {inflateHeld ? "Inflating..." : "Inflate center"}
+      </button>
+
+      <button
+        onClick={() => setShowOuterRing((visible) => !visible)}
+        style={{
+          position: "fixed",
+          top: "70px",
+          right: "20px",
+          padding: "10px 16px",
+          fontSize: "15px",
+          borderRadius: "8px",
+          border: "1px solid rgba(255, 255, 255, 0.2)",
+          background: "rgba(17, 17, 17, 0.82)",
+          color: "white",
+          cursor: "pointer",
+          zIndex: 2,
+        }}
+      >
+        {showOuterRing ? "Hide outer ring" : "Show outer ring"}
       </button>
 
       {controlsVisible && (
@@ -228,17 +282,6 @@ export default function App() {
           </div>
         ))}
         <label>
-          Beads: {beadCount}
-          <input
-            type="range"
-            min={0}
-            max={20}
-            value={beadCount}
-            onChange={(event) => setBeadCount(Number(event.target.value))}
-            style={{ display: "block" }}
-          />
-        </label>
-        <label>
           Scale
           <select
             value={scaleName}
@@ -256,6 +299,7 @@ export default function App() {
             <option value="gMixolydian">G mixolydian</option>
             <option value="hirajoshi">Hirajoshi</option>
             <option value="wholeTone">Whole tone</option>
+            <option value="indianxD">Indian xD</option>
           </select>
         </label>
         <label>
