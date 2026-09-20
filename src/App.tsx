@@ -65,6 +65,35 @@ export default function App() {
 
   const settings = patternSettings[activePattern];
 
+  const exportSettings = () => {
+    const blob = new Blob([JSON.stringify(patternSettings, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "combo-music-visualizer-patterns.json";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  const importSettings = async (file: File) => {
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        throw new Error("Expected a non-empty array of pattern settings.");
+      }
+      setPatternSettings(
+        parsed.map((pattern) => ({ ...createDefaultWheelSettings(), ...pattern }))
+      );
+      setActivePattern(0);
+    } catch (error) {
+      console.warn("Failed to import pattern settings:", error);
+    }
+  };
+
   const updatePatternSetting = <K extends keyof WheelSettings>(
     index: number,
     key: K,
@@ -323,6 +352,55 @@ export default function App() {
       >
         {showOuterRing ? "Hide outer ring" : "Show outer ring"}
       </button>
+
+      <button
+        onClick={exportSettings}
+        style={{
+          position: "fixed",
+          top: "120px",
+          right: "20px",
+          padding: "10px 16px",
+          fontSize: "15px",
+          borderRadius: "8px",
+          border: "1px solid rgba(255, 255, 255, 0.2)",
+          background: "rgba(17, 17, 17, 0.82)",
+          color: "white",
+          cursor: "pointer",
+          zIndex: 2,
+        }}
+      >
+        Export settings
+      </button>
+
+      <button
+        onClick={() => importInputRef.current?.click()}
+        style={{
+          position: "fixed",
+          top: "170px",
+          right: "20px",
+          padding: "10px 16px",
+          fontSize: "15px",
+          borderRadius: "8px",
+          border: "1px solid rgba(255, 255, 255, 0.2)",
+          background: "rgba(17, 17, 17, 0.82)",
+          color: "white",
+          cursor: "pointer",
+          zIndex: 2,
+        }}
+      >
+        Import settings
+      </button>
+      <input
+        ref={importInputRef}
+        type="file"
+        accept="application/json"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) importSettings(file);
+          event.target.value = "";
+        }}
+        style={{ display: "none" }}
+      />
 
       {controlsVisible && (
       <div
