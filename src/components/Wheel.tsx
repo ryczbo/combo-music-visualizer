@@ -5,13 +5,17 @@ import * as THREE from "three";
 import { AudioEngine } from "../services/audioEngine";
 
 type WheelProps = {
-  activeAxes: Record<"x" | "y" | "z", boolean>;
-  axisDirections: Record<"x" | "y" | "z", 1 | -1>;
-  axisSpeeds: Record<"x" | "y" | "z", number>;
+  spinning: boolean;
+  spinDirection: 1 | -1;
+  spinSpeed: number;
   audioEngine: AudioEngine;
   noteOptions: string[];
   inflateHeld: boolean;
   showOuterRing: boolean;
+  sectionCount: number;
+  beadCount: number;
+  onBeadCountChange: (count: number) => void;
+  onFullSpin: () => void;
 };
 
 type SpokeBeadProps = {
@@ -33,7 +37,6 @@ type SpokeBeadProps = {
   ) => { distance: number; velocity: number } | undefined;
 };
 
-const SPOKE_COUNT = 20;
 const WHEEL_RADIUS = 4;
 const SPOKE_START = 0.35;
 const SPOKE_LENGTH = WHEEL_RADIUS - 0.7;
@@ -57,8 +60,10 @@ const OUTER_RING_RADIUS = RIM_RADIUS + RIM_TUBE + BEAD_RADIUS + OUTER_RING_WIDTH
 const OUTER_RING_INNER_RADIUS = OUTER_RING_RADIUS - OUTER_RING_WIDTH / 2;
 const OUTER_RING_OUTER_RADIUS = OUTER_RING_RADIUS + OUTER_RING_WIDTH / 2;
 
-const shuffledSpokes = Array.from({ length: SPOKE_COUNT }, (_, index) => index)
-  .sort(() => Math.random() - 0.5);
+function shuffledSpokeIndices(count: number) {
+  return Array.from({ length: count }, (_, index) => index)
+    .sort(() => Math.random() - 0.5);
+}
 
 // Sector base color matches the collision flash hue; hover uses a distinct teal so
 // the two kinds of light-up never look the same.
@@ -190,18 +195,24 @@ function SpokeBead({
 }
 
 export function Wheel({
-  activeAxes,
-  axisDirections,
-  axisSpeeds,
+  spinning,
+  spinDirection,
+  spinSpeed,
   audioEngine,
   noteOptions,
   inflateHeld,
   showOuterRing,
+  sectionCount,
+  beadCount,
+  onBeadCountChange,
+  onFullSpin,
 }: WheelProps) {
   const wheel = useRef<THREE.Group>(null);
+  // Accumulated unsigned rotation since the last completed full spin.
+  const spinProgress = useRef(0);
   // Which spokes currently carry a bead; toggled by clicking their space.
   const [activeSpokes, setActiveSpokes] = useState<Set<number>>(
-    () => new Set(shuffledSpokes.slice(0, 2))
+    () => new Set(shuffledSpokeIndices(sectionCount).slice(0, beadCount))
   );
   const beadStates = useRef(new Map<number, { distance: number; velocity: number }>());
   const suppressSoundsUntil = useRef(0);
@@ -218,21 +229,52 @@ export function Wheel({
   }
   // Which outer-ring sector currently has its note-picker dropdown open.
   const [editingSector, setEditingSector] = useState<number | null>(null);
-  const axesStopped = !activeAxes.x && !activeAxes.y && !activeAxes.z;
+  const axesStopped = !spinning;
   // Each spoke owns the "space" (sector) that follows it; that space carries a
   // fixed note and lights up on collision instead of the bead or the spoke.
-  const sectorFlash = useRef(new Float32Array(SPOKE_COUNT));
+  const sectorFlash = useRef(new Float32Array(sectionCount));
   const sectorMaterials = useRef<Array<THREE.MeshStandardMaterial | null>>(
-    new Array(SPOKE_COUNT).fill(null)
+    new Array(sectionCount).fill(null)
   );
   const outerSectorMaterials = useRef<Array<THREE.MeshStandardMaterial | null>>(
-    new Array(SPOKE_COUNT).fill(null)
+    new Array(sectionCount).fill(null)
   );
   const spokeMaterials = useRef<Array<THREE.MeshStandardMaterial | null>>(
-    new Array(SPOKE_COUNT).fill(null)
+    new Array(sectionCount).fill(null)
   );
   const hoveredSector = useRef<number | null>(null);
   const pressedSector = useRef<number | null>(null);
+
+  // Resize per-sector ref arrays whenever the section count changes.
+  useEffect(() => {
+    sectorFlash.current = new Float32Array(sectionCount);
+    sectorMaterials.current = new Array(sectionCount).fill(null);
+    outerSectorMaterials.current = new Array(sectionCount).fill(null);
+    spokeMaterials.current = new Array(sectionCount).fill(null);
+    hoveredSector.current = null;
+    pressedSector.current = null;
+  }, [sectionCount]);
+
+  // Drop any beads/overrides/dropdown that no longer fit within the new range.
+  const [lastSectionCount, setLastSectionCount] = useState(sectionCount);
+  if (sectionCount !== lastSectionCount) {
+    setLastSectionCount(sectionCount);
+    setActiveSpokes((current) => {
+      const filtered = new Set(
+        Array.from(current).filter((index) => index < sectionCount)
+      );
+      if (filtered.size === 0) filtered.add(0);
+      return filtered;
+    });
+    setNoteOverrides((current) => {
+      const next = new Map<number, string>();
+      for (const [index, note] of current) {
+        if (index < sectionCount) next.set(index, note);
+      }
+      return next;
+    });
+    setEditingSector(null);
+  }
   const hubFlash = useRef(0);
   const hubMaterial = useRef<THREE.MeshStandardMaterial | null>(null);
   const hubMesh = useRef<THREE.Mesh>(null);
@@ -251,13 +293,47 @@ export function Wheel({
 
   useEffect(() => {
     suppressSoundsUntil.current = performance.now() + 180;
-  }, [axisSpeeds]);
+  }, [spinSpeed]);
+
+  // Add or remove beads so the on-wheel count matches the wheel-controls bar.
+  const [lastBeadCount, setLastBeadCount] = useState(beadCount);
+  if (beadCount !== lastBeadCount) {
+    setLastBeadCount(beadCount);
+    setActiveSpokes((current) => {
+      if (current.size === beadCount) return current;
+      const next = new Set(current);
+      if (next.size < beadCount) {
+        const candidates = shuffledSpokeIndices(sectionCount).filter(
+          (index) => !next.has(index)
+        );
+        for (
+          let added = 0;
+          next.size < beadCount && added < candidates.length;
+          added += 1
+        ) {
+          next.add(candidates[added]);
+        }
+      } else {
+        const removable = Array.from(next).sort(() => Math.random() - 0.5);
+        for (let removed = 0; next.size > beadCount && removed < removable.length; removed += 1) {
+          next.delete(removable[removed]);
+        }
+      }
+      return next;
+    });
+  }
+
+  // Report the actual bead count back up whenever it changes for any reason
+  // (manual clicks, a bead popping, or the section count shrinking).
+  useEffect(() => {
+    onBeadCountChange(activeSpokes.size);
+  }, [activeSpokes, onBeadCountChange]);
 
   const noteForSpoke = (spokeIndex: number) =>
     noteOverrides.get(spokeIndex) ?? noteOptions[spokeIndex % noteOptions.length];
 
   const sectorAngle = (spokeIndex: number) =>
-    (spokeIndex / SPOKE_COUNT) * Math.PI * 2 + Math.PI / 2;
+    (spokeIndex / sectionCount) * Math.PI * 2 + Math.PI / 2;
 
   const flashSector = (spokeIndex: number) => {
     sectorFlash.current[spokeIndex] = 1;
@@ -300,18 +376,19 @@ export function Wheel({
   };
 
   useFrame((_, delta) => {
-    if (wheel.current) {
-      for (const axis of ["x", "y", "z"] as const) {
-        if (activeAxes[axis]) {
-          wheel.current.rotation[axis] +=
-            delta * axisSpeeds[axis] * 0.1 * axisDirections[axis];
-        }
+    if (wheel.current && spinning) {
+      const rotationDelta = delta * spinSpeed * 0.1 * spinDirection;
+      wheel.current.rotation.z += rotationDelta;
+      spinProgress.current += Math.abs(rotationDelta);
+      while (spinProgress.current >= Math.PI * 2) {
+        spinProgress.current -= Math.PI * 2;
+        onFullSpin();
       }
     }
 
     // Fade lit-up sectors and hub back toward their resting bioluminescent glow.
     const decay = Math.exp(-6 * delta);
-    for (let index = 0; index < SPOKE_COUNT; index += 1) {
+    for (let index = 0; index < sectionCount; index += 1) {
       sectorFlash.current[index] *= decay;
       const material = sectorMaterials.current[index];
       if (material) {
@@ -422,7 +499,7 @@ export function Wheel({
 
           {/* Ring segments echoing each inner sector's collision/hover glow on the outer ring;
               clickable to reassign that sector's note once the wheel is fully stopped. */}
-          {Array.from({ length: SPOKE_COUNT }, (_, index) => (
+          {Array.from({ length: sectionCount }, (_, index) => (
             <mesh
               key={index}
               position={[0, 0, -0.02]}
@@ -448,8 +525,8 @@ export function Wheel({
                   OUTER_RING_OUTER_RADIUS,
                   8,
                   1,
-                  (index / SPOKE_COUNT) * Math.PI * 2 + Math.PI / 2 - Math.PI / SPOKE_COUNT,
-                  (Math.PI * 2) / SPOKE_COUNT,
+                  (index / sectionCount) * Math.PI * 2 + Math.PI / 2 - Math.PI / sectionCount,
+                  (Math.PI * 2) / sectionCount,
                 ]}
               />
               <meshStandardMaterial
@@ -469,7 +546,7 @@ export function Wheel({
           ))}
 
           {/* Note name for each outer sector, matching its connected inner sector. */}
-          {Array.from({ length: SPOKE_COUNT }, (_, index) => {
+          {Array.from({ length: sectionCount }, (_, index) => {
             const angle = sectorAngle(index);
             return (
               <Text
@@ -525,10 +602,10 @@ export function Wheel({
       )}
 
       {/* Thin dark-blue spokes, purely structural. */}
-      {Array.from({ length: SPOKE_COUNT }, (_, index) => (
+      {Array.from({ length: sectionCount }, (_, index) => (
         <group
           key={index}
-          rotation={[0, 0, (index / SPOKE_COUNT) * Math.PI * 2]}
+          rotation={[0, 0, (index / sectionCount) * Math.PI * 2]}
         >
           <mesh position={[0, SPOKE_START + SPOKE_LENGTH / 2, 0]}>
             <cylinderGeometry args={[0.02, 0.02, SPOKE_LENGTH, 6]} />
@@ -550,7 +627,7 @@ export function Wheel({
 
       {/* Wedge for the space centered on each spoke, lit up on that space's collision
           and clickable to add or remove that space's bead. */}
-      {Array.from({ length: SPOKE_COUNT }, (_, index) => (
+      {Array.from({ length: sectionCount }, (_, index) => (
         <mesh
           key={index}
           position={[0, 0, -0.02]}
@@ -584,8 +661,8 @@ export function Wheel({
               RIM_RADIUS,
               8,
               1,
-              (index / SPOKE_COUNT) * Math.PI * 2 + Math.PI / 2 - Math.PI / SPOKE_COUNT,
-              (Math.PI * 2) / SPOKE_COUNT,
+              (index / sectionCount) * Math.PI * 2 + Math.PI / 2 - Math.PI / sectionCount,
+              (Math.PI * 2) / sectionCount,
             ]}
           />
           <meshStandardMaterial
@@ -608,7 +685,7 @@ export function Wheel({
         <SpokeBead
           key={spokeIndex}
           wheel={wheel}
-          spokeAngle={(spokeIndex / SPOKE_COUNT) * Math.PI * 2}
+          spokeAngle={(spokeIndex / sectionCount) * Math.PI * 2}
           initialDistance={BEAD_DROP_DISTANCE}
           note={noteForSpoke(spokeIndex)}
           audioEngine={audioEngine}

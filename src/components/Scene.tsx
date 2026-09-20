@@ -3,23 +3,31 @@ import { AudioEngine } from "../services/audioEngine";
 import { Wheel } from "./Wheel";
 
 type SceneProps = {
-  activeAxes: Record<"x" | "y" | "z", boolean>;
-  axisDirections: Record<"x" | "y" | "z", 1 | -1>;
-  axisSpeeds: Record<"x" | "y" | "z", number>;
+  spinning: boolean;
+  spinDirection: 1 | -1;
+  spinSpeed: number;
   audioEngine: AudioEngine;
   noteOptions: string[];
   inflateHeld: boolean;
   showOuterRing: boolean;
+  sectionCount: number;
+  beadCount: number;
+  onBeadCountChange: (count: number) => void;
+  onFullSpin: () => void;
 };
 
 export function Scene({
-  activeAxes,
-  axisDirections,
-  axisSpeeds,
+  spinning,
+  spinDirection,
+  spinSpeed,
   audioEngine,
   noteOptions,
   inflateHeld,
   showOuterRing,
+  sectionCount,
+  beadCount,
+  onBeadCountChange,
+  onFullSpin,
 }: SceneProps) {
   return (
     <>
@@ -35,13 +43,17 @@ export function Scene({
       />
 
       <Wheel
-        activeAxes={activeAxes}
-        axisDirections={axisDirections}
-        axisSpeeds={axisSpeeds}
+        spinning={spinning}
+        spinDirection={spinDirection}
+        spinSpeed={spinSpeed}
         audioEngine={audioEngine}
         noteOptions={noteOptions}
         inflateHeld={inflateHeld}
         showOuterRing={showOuterRing}
+        sectionCount={sectionCount}
+        beadCount={beadCount}
+        onBeadCountChange={onBeadCountChange}
+        onFullSpin={onFullSpin}
       />
 
       <OrbitControls target={[0, 0, 0]} enablePan={false} />
