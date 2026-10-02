@@ -1,6 +1,24 @@
 // Frequencies are kept in one place so every selectable scale uses the same
 // note names for bead assignment and audio playback.
+function createChromaticScale(): Record<string, number> {
+  const pitchClasses = [
+    "C", "C#", "D", "D#", "E", "F",
+    "F#", "G", "G#", "A", "A#", "B",
+  ];
+  const scale: Record<string, number> = {};
+
+  for (let midiNote = 48; midiNote <= 95; midiNote += 1) {
+    const octave = Math.floor(midiNote / 12) - 1;
+    const pitchClass = pitchClasses[midiNote % 12];
+    const name = `${pitchClass}${octave}`;
+    scale[name] = 440 * 2 ** ((midiNote - 69) / 12);
+  }
+
+  return scale;
+}
+
 export const SCALES = {
+  custom: createChromaticScale(),
   ePhrygianDominant: {
     E4: 329.63,
     F4: 349.23,
@@ -94,7 +112,7 @@ export const SCALES = {
     "G#4": 415.3,
     "A#4": 466.16,
   },
-  indianxD: {
+  indian: {
     Sa: 240.0,
     Re: 270.0,
     Ga: 288.0,

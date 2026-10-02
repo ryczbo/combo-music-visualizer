@@ -6,13 +6,21 @@ import { SCALES, expandScaleOctaves, type ScaleName } from "./constants/notes";
 
 const audioEngine = new AudioEngine();
 
-const MAX_PATTERN_COUNT = 20;
+const MAX_PATTERN_COUNT = 30;
+
+type BeadStartingPosition = "start" | "middle" | "end";
+
+type PatternBead = {
+  spoke: number;
+  startingPosition: BeadStartingPosition;
+  note: string;
+};
 
 type WheelSettings = {
   active: boolean;
   length: number;
   sectionCount: number;
-  beadCount: number;
+  beads: PatternBead[];
   spinDirection: 1 | -1;
   spinSpeed: number;
   scaleName: ScaleName;
@@ -28,15 +36,37 @@ type WheelSettings = {
   lfoRate: number;
 };
 
+function getScaleNoteNames(scaleName: ScaleName) {
+  return Object.entries(expandScaleOctaves(SCALES[scaleName]))
+    .sort((left, right) => left[1] - right[1])
+    .map(([note]) => note);
+}
+
+function createDefaultBead(
+  index: number,
+  spoke = index,
+  scaleName: ScaleName = "ePhrygianDominant"
+): PatternBead {
+  const noteNames = getScaleNoteNames(scaleName);
+  const positions: BeadStartingPosition[] = ["start", "middle", "end"];
+  return {
+    spoke,
+    startingPosition: positions[index % positions.length],
+    note: noteNames[index % noteNames.length],
+  };
+}
+
 // Clockwise by default; a negative spin direction reads as clockwise on screen.
-const createDefaultWheelSettings = (): WheelSettings => ({
+const createDefaultWheelSettings = (
+  scaleName: ScaleName = "ePhrygianDominant"
+): WheelSettings => ({
   active: false,
   length: 4,
   sectionCount: 20,
-  beadCount: 2,
+  beads: [createDefaultBead(0, 0, scaleName), createDefaultBead(1, 1, scaleName)],
   spinDirection: -1,
   spinSpeed: 8,
-  scaleName: "ePhrygianDominant",
+  scaleName,
   volume: 0.8,
   tone: 1,
   reverb: 0.24,
@@ -60,8 +90,8 @@ export default function App() {
   const [controlsVisible, setControlsVisible] = useState(true);
   const [inflateHeld, setInflateHeld] = useState(false);
   const [showOuterRing, setShowOuterRing] = useState(true);
-  // Counts full wheel spins completed on the currently playing pattern.
-  const spinsCompletedRef = useRef(0);
+  // Counts section-width turns completed on the currently playing pattern.
+  const sectionsCompletedRef = useRef(0);
 
   const settings = patternSettings[activePattern];
 
@@ -86,7 +116,41 @@ export default function App() {
         throw new Error("Expected a non-empty array of pattern settings.");
       }
       setPatternSettings(
-        parsed.map((pattern) => ({ ...createDefaultWheelSettings(), ...pattern }))
+        parsed.map((pattern) => {
+          const legacyPattern = pattern as Partial<WheelSettings> & {
+            beadCount?: number;
+          };
+          const defaults = createDefaultWheelSettings();
+          const { beadCount: legacyBeadCount, beads: savedBeads, ...savedSettings } =
+            legacyPattern;
+          const sectionCount = savedSettings.sectionCount ?? defaults.sectionCount;
+          const scaleName = savedSettings.scaleName ?? defaults.scaleName;
+          const usedSpokes = new Set<number>();
+          const importedBeads = Array.isArray(savedBeads)
+            ? savedBeads.slice(0, sectionCount).map((bead, index) => {
+                const savedSpoke = Number.isInteger(bead.spoke)
+                  ? bead.spoke
+                  : index;
+                const spoke =
+                  savedSpoke >= 0 &&
+                  savedSpoke < sectionCount &&
+                  !usedSpokes.has(savedSpoke)
+                    ? savedSpoke
+                    : Array.from({ length: sectionCount }, (_, candidate) => candidate)
+                        .find((candidate) => !usedSpokes.has(candidate)) ?? 0;
+                usedSpokes.add(spoke);
+                return {
+                  spoke,
+                  startingPosition: bead.startingPosition ?? "middle",
+                  note: bead.note ?? createDefaultBead(index, spoke, scaleName).note,
+                };
+              })
+            : Array.from(
+                { length: Math.min(sectionCount, legacyBeadCount ?? defaults.beads.length) },
+                (_, index) => createDefaultBead(index, index, scaleName)
+              );
+          return { ...defaults, ...savedSettings, beads: importedBeads };
+        })
       );
       setActivePattern(0);
     } catch (error) {
@@ -120,19 +184,46 @@ export default function App() {
   const updatePatternLength = (index: number, length: number) =>
     updatePatternSetting(index, "length", length);
 
-  const updatePatternCount = (count: number) => {
-    setPatternSettings((current) => {
-      if (count === current.length) return current;
-      if (count > current.length) {
-        const additional = Array.from({ length: count - current.length }, () => ({
-          ...createDefaultWheelSettings(),
-          active: false,
-        }));
-        return [...current, ...additional];
-      }
-      return current.slice(0, count);
+  const updateSectionCount = (value: number) => {
+    updateSetting("sectionCount", value);
+    const usedSpokes = new Set<number>();
+    const beads = settings.beads.slice(0, value).map((bead, index) => {
+      const spoke =
+        bead.spoke >= 0 && bead.spoke < value && !usedSpokes.has(bead.spoke)
+          ? bead.spoke
+          : Array.from({ length: value }, (_, candidate) => candidate)
+              .find((candidate) => !usedSpokes.has(candidate)) ?? index;
+      usedSpokes.add(spoke);
+      return { ...bead, spoke };
     });
-    setActivePattern((current) => Math.min(current, count - 1));
+    if (
+      beads.length !== settings.beads.length ||
+      beads.some((bead, index) => bead.spoke !== settings.beads[index]?.spoke)
+    ) {
+      updateBeads(beads);
+    }
+  };
+
+  const copyPattern = () => {
+    if (patternSettings.length >= MAX_PATTERN_COUNT) return;
+
+    const copy = {
+      ...settings,
+      beads: settings.beads.map((bead) => ({ ...bead })),
+    };
+    setPatternSettings((current) => [...current, copy]);
+    setActivePattern(patternSettings.length);
+  };
+
+  const deletePattern = (index: number) => {
+    if (patternSettings.length <= 1) return;
+
+    setPatternSettings((current) => current.filter((_, itemIndex) => itemIndex !== index));
+    setActivePattern((current) => {
+      if (current === index) return Math.min(index, patternSettings.length - 2);
+      return current > index ? current - 1 : current;
+    });
+    if (activePattern === index) sectionsCompletedRef.current = 0;
   };
 
   const advanceToNextActivePattern = () => {
@@ -145,10 +236,10 @@ export default function App() {
     });
   };
 
-  const handleFullSpin = () => {
-    spinsCompletedRef.current += 1;
-    if (settings.length > 0 && spinsCompletedRef.current >= settings.length) {
-      spinsCompletedRef.current = 0;
+  const handleSectionTurn = () => {
+    sectionsCompletedRef.current += 1;
+    if (sectionsCompletedRef.current >= settings.length) {
+      sectionsCompletedRef.current = 0;
       advanceToNextActivePattern();
     }
   };
@@ -156,7 +247,7 @@ export default function App() {
   const toggleSpin = async () => {
     if (!spinning) {
       await audioEngine.start();
-      spinsCompletedRef.current = 0;
+      sectionsCompletedRef.current = 0;
       const firstActiveIndex = patternSettings.findIndex((pattern) => pattern.active);
       if (firstActiveIndex !== -1) {
         setActivePattern(firstActiveIndex);
@@ -171,7 +262,29 @@ export default function App() {
 
   const updateSpinSpeed = (value: number) => updateSetting("spinSpeed", value);
 
-  const updateBeadCount = (value: number) => updateSetting("beadCount", value);
+  const updateBeads = (beads: PatternBead[]) => updateSetting("beads", beads);
+
+  const updateBeadNote = (beads: PatternBead[]) => {
+    updateSetting("scaleName", "custom");
+    updateBeads(beads);
+  };
+
+  const updateBeadCount = (value: number) => {
+    const currentBeads = settings.beads;
+    const targetCount = Math.min(value, settings.sectionCount);
+    const nextBeads = currentBeads.slice(0, targetCount);
+    const usedSpokes = new Set(nextBeads.map((bead) => bead.spoke));
+    for (let index = nextBeads.length; index < targetCount; index += 1) {
+      const spoke = Array.from(
+        { length: settings.sectionCount },
+        (_, candidate) => candidate
+      ).find((candidate) => !usedSpokes.has(candidate));
+      if (spoke === undefined) break;
+      usedSpokes.add(spoke);
+      nextBeads.push(createDefaultBead(index, spoke, settings.scaleName));
+    }
+    updateBeads(nextBeads);
+  };
 
   const updateVolume = (value: number) => updateSetting("volume", value);
 
@@ -198,7 +311,16 @@ export default function App() {
 
   const updateLfoRate = (value: number) => updateSetting("lfoRate", value);
 
-  const updateScale = (value: ScaleName) => updateSetting("scaleName", value);
+  const updateScale = (value: ScaleName) => {
+    const scaleNotes = getScaleNoteNames(value);
+    updateSetting("scaleName", value);
+    updateBeads(
+      settings.beads.map((bead, index) => ({
+        ...bead,
+        note: scaleNotes[index % scaleNotes.length],
+      }))
+    );
+  };
 
   // Re-apply the active pattern's audio settings whenever they change, and
   // whenever switching to a pattern that remembers different values.
@@ -245,14 +367,14 @@ export default function App() {
   // Register three octaves of the scale so the sector note picker can offer a
   // wider range than the single octave used for automatic sector assignment.
   useEffect(() => {
-    audioEngine.setScale(expandScaleOctaves(SCALES[settings.scaleName]));
+    audioEngine.setScale({
+      ...expandScaleOctaves(SCALES[settings.scaleName]),
+      ...SCALES.custom,
+    });
   }, [settings.scaleName]);
 
-  const noteOptions = Object.entries(
-    expandScaleOctaves(SCALES[settings.scaleName])
-  )
-    .sort((a, b) => a[1] - b[1])
-    .map(([note]) => note);
+  const noteOptions = Object.keys(SCALES.custom);
+  const scaleNotes = getScaleNoteNames(settings.scaleName);
 
   return (
     <>
@@ -274,12 +396,14 @@ export default function App() {
           spinSpeed={settings.spinSpeed}
           audioEngine={audioEngine}
           noteOptions={noteOptions}
+          scaleNotes={scaleNotes}
           inflateHeld={inflateHeld}
           showOuterRing={showOuterRing}
           sectionCount={settings.sectionCount}
-          beadCount={settings.beadCount}
-          onBeadCountChange={updateBeadCount}
-          onFullSpin={handleFullSpin}
+          beads={settings.beads}
+          onBeadsChange={updateBeads}
+          onBeadNoteChange={updateBeadNote}
+          onSectionTurn={handleSectionTurn}
         />
       </Canvas>
 
@@ -436,22 +560,24 @@ export default function App() {
           {spinning ? "Stop Spin" : "Spin"}
         </button>
 
-        <label>
-          Patterns
-          <select
-            value={patternSettings.length}
-            onChange={(event) => updatePatternCount(Number(event.target.value))}
-            style={{ display: "block", width: "100%" }}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <button
+            onClick={copyPattern}
+            disabled={patternSettings.length >= MAX_PATTERN_COUNT}
+            style={{
+              flex: 1,
+              padding: "10px 8px",
+              fontSize: "15px",
+              borderRadius: "8px",
+              border: "none",
+              cursor: patternSettings.length >= MAX_PATTERN_COUNT ? "not-allowed" : "pointer",
+              opacity: patternSettings.length >= MAX_PATTERN_COUNT ? 0.5 : 1,
+            }}
           >
-            {Array.from({ length: MAX_PATTERN_COUNT }, (_, index) => index + 1).map(
-              (count) => (
-                <option key={count} value={count}>
-                  {count}
-                </option>
-              )
-            )}
-          </select>
-        </label>
+            Copy pattern
+          </button>
+          <span>{patternSettings.length}/{MAX_PATTERN_COUNT}</span>
+        </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           {patternSettings.map((_, index) => (
@@ -485,13 +611,34 @@ export default function App() {
                     />
                     Active
                   </label>
+                  <button
+                    type="button"
+                    onClick={() => deletePattern(index)}
+                    disabled={patternSettings.length === 1}
+                    aria-label={`Delete pattern ${index + 1}`}
+                    title="Delete pattern"
+                    style={{
+                      marginLeft: "auto",
+                      width: "24px",
+                      height: "24px",
+                      padding: 0,
+                      border: "1px solid rgba(255, 255, 255, 0.25)",
+                      borderRadius: "4px",
+                      color: "white",
+                      background: "rgba(255, 80, 100, 0.2)",
+                      cursor: patternSettings.length === 1 ? "not-allowed" : "pointer",
+                      opacity: patternSettings.length === 1 ? 0.45 : 1,
+                    }}
+                  >
+                    ×
+                  </button>
                 </div>
                 <label>
-                  Length: {patternSettings[index].length}
+                  Sections per pattern: {patternSettings[index].length}
                   <input
                     type="range"
-                    min={0}
-                    max={30}
+                    min={1}
+                    max={20}
                     step={1}
                     value={patternSettings[index].length}
                     onChange={(event) =>
@@ -513,20 +660,18 @@ export default function App() {
             max={20}
             step={1}
             value={settings.sectionCount}
-            onChange={(event) =>
-              updateSetting("sectionCount", Number(event.target.value))
-            }
+            onChange={(event) => updateSectionCount(Number(event.target.value))}
             style={{ display: "block", width: "100%" }}
           />
         </label>
         <label>
-          Beads: {settings.beadCount}
+          Beads: {settings.beads.length}
           <input
             type="range"
             min={0}
-            max={20}
+            max={settings.sectionCount}
             step={1}
-            value={settings.beadCount}
+            value={settings.beads.length}
             onChange={(event) => updateBeadCount(Number(event.target.value))}
             style={{ display: "block", width: "100%" }}
           />
@@ -567,6 +712,7 @@ export default function App() {
             onChange={(event) => updateScale(event.target.value as ScaleName)}
             style={{ display: "block", width: "100%" }}
           >
+            <option value="custom">Custom chromatic (C3-B6)</option>
             <option value="ePhrygianDominant">E Phrygian dominant</option>
             <option value="eMinorPentatonic">E minor pentatonic</option>
             <option value="cMajor">C major</option>
@@ -578,7 +724,7 @@ export default function App() {
             <option value="gMixolydian">G mixolydian</option>
             <option value="hirajoshi">Hirajoshi</option>
             <option value="wholeTone">Whole tone</option>
-            <option value="indianxD">Indian xD</option>
+            <option value="indian">Indian</option>
           </select>
         </label>
         <label>

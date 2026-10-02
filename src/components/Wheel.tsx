@@ -1,8 +1,16 @@
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Html, Text } from "@react-three/drei";
 import * as THREE from "three";
 import { AudioEngine } from "../services/audioEngine";
+
+type BeadStartingPosition = "start" | "middle" | "end";
+
+type PatternBead = {
+  spoke: number;
+  startingPosition: BeadStartingPosition;
+  note: string;
+};
 
 type WheelProps = {
   spinning: boolean;
@@ -10,12 +18,14 @@ type WheelProps = {
   spinSpeed: number;
   audioEngine: AudioEngine;
   noteOptions: string[];
+  scaleNotes: string[];
   inflateHeld: boolean;
   showOuterRing: boolean;
   sectionCount: number;
-  beadCount: number;
-  onBeadCountChange: (count: number) => void;
-  onFullSpin: () => void;
+  beads: PatternBead[];
+  onBeadsChange: (beads: PatternBead[]) => void;
+  onBeadNoteChange: (beads: PatternBead[]) => void;
+  onSectionTurn: () => void;
 };
 
 type SpokeBeadProps = {
@@ -42,7 +52,7 @@ const SPOKE_START = 0.35;
 const SPOKE_LENGTH = WHEEL_RADIUS - 0.7;
 const BEAD_RADIUS = 0.16;
 // Where a newly toggled-on bead drops in from along its spoke.
-const BEAD_DROP_DISTANCE = SPOKE_START + SPOKE_LENGTH * 0.6;
+const BEAD_DROP_DISTANCE = SPOKE_START + SPOKE_LENGTH * 0.5;
 const HUB_BASE_RADIUS = 0.42;
 const HUB_MAX_RADIUS = WHEEL_RADIUS - 0.28 - 0.5;
 const HUB_INFLATE_SPEED = 1.4;
@@ -60,9 +70,17 @@ const OUTER_RING_RADIUS = RIM_RADIUS + RIM_TUBE + BEAD_RADIUS + OUTER_RING_WIDTH
 const OUTER_RING_INNER_RADIUS = OUTER_RING_RADIUS - OUTER_RING_WIDTH / 2;
 const OUTER_RING_OUTER_RADIUS = OUTER_RING_RADIUS + OUTER_RING_WIDTH / 2;
 
-function shuffledSpokeIndices(count: number) {
-  return Array.from({ length: count }, (_, index) => index)
-    .sort(() => Math.random() - 0.5);
+function getStartingDistance(
+  startingPosition: BeadStartingPosition,
+  hubRadius: number
+) {
+  if (startingPosition === "start") {
+    return hubRadius + HUB_CONTACT_OFFSET + 0.08;
+  }
+  if (startingPosition === "end") {
+    return SPOKE_START + SPOKE_LENGTH - BEAD_RADIUS - 0.08;
+  }
+  return BEAD_DROP_DISTANCE;
 }
 
 // Sector base color matches the collision flash hue; hover uses a distinct teal so
@@ -94,6 +112,11 @@ function SpokeBead({
   const distance = useRef(initialDistance);
   const velocity = useRef(0);
   const lastImpactTime = useRef(-Infinity);
+
+  useEffect(() => {
+    distance.current = initialDistance;
+    velocity.current = 0;
+  }, [initialDistance]);
 
   useFrame((_, delta) => {
     if (!bead.current) return;
@@ -200,34 +223,25 @@ export function Wheel({
   spinSpeed,
   audioEngine,
   noteOptions,
+  scaleNotes,
   inflateHeld,
   showOuterRing,
   sectionCount,
-  beadCount,
-  onBeadCountChange,
-  onFullSpin,
+  beads,
+  onBeadsChange,
+  onBeadNoteChange,
+  onSectionTurn,
 }: WheelProps) {
   const wheel = useRef<THREE.Group>(null);
-  // Accumulated unsigned rotation since the last completed full spin.
+  // Accumulated rotation toward the next section boundary.
   const spinProgress = useRef(0);
-  // Which spokes currently carry a bead; toggled by clicking their space.
-  const [activeSpokes, setActiveSpokes] = useState<Set<number>>(
-    () => new Set(shuffledSpokeIndices(sectionCount).slice(0, beadCount))
+  const activeSpokes = useMemo(
+    () => new Set(beads.map((bead) => bead.spoke)),
+    [beads]
   );
   const beadStates = useRef(new Map<number, { distance: number; velocity: number }>());
   const suppressSoundsUntil = useRef(0);
-  // Per-sector note assignments the user picked from the outer ring dropdown,
-  // overriding the scale's default cycling assignment.
-  const [noteOverrides, setNoteOverrides] = useState<Map<number, string>>(
-    new Map()
-  );
-  const notesKey = noteOptions.join("|");
-  const [lastNotesKey, setLastNotesKey] = useState(notesKey);
-  if (notesKey !== lastNotesKey) {
-    setLastNotesKey(notesKey);
-    setNoteOverrides(new Map());
-  }
-  // Which outer-ring sector currently has its note-picker dropdown open.
+  // Which outer-ring sector currently has its bead editor open.
   const [editingSector, setEditingSector] = useState<number | null>(null);
   const axesStopped = !spinning;
   // Each spoke owns the "space" (sector) that follows it; that space carries a
@@ -255,26 +269,6 @@ export function Wheel({
     pressedSector.current = null;
   }, [sectionCount]);
 
-  // Drop any beads/overrides/dropdown that no longer fit within the new range.
-  const [lastSectionCount, setLastSectionCount] = useState(sectionCount);
-  if (sectionCount !== lastSectionCount) {
-    setLastSectionCount(sectionCount);
-    setActiveSpokes((current) => {
-      const filtered = new Set(
-        Array.from(current).filter((index) => index < sectionCount)
-      );
-      if (filtered.size === 0) filtered.add(0);
-      return filtered;
-    });
-    setNoteOverrides((current) => {
-      const next = new Map<number, string>();
-      for (const [index, note] of current) {
-        if (index < sectionCount) next.set(index, note);
-      }
-      return next;
-    });
-    setEditingSector(null);
-  }
   const hubFlash = useRef(0);
   const hubMaterial = useRef<THREE.MeshStandardMaterial | null>(null);
   const hubMesh = useRef<THREE.Mesh>(null);
@@ -295,42 +289,47 @@ export function Wheel({
     suppressSoundsUntil.current = performance.now() + 180;
   }, [spinSpeed]);
 
-  // Add or remove beads so the on-wheel count matches the wheel-controls bar.
-  const [lastBeadCount, setLastBeadCount] = useState(beadCount);
-  if (beadCount !== lastBeadCount) {
-    setLastBeadCount(beadCount);
-    setActiveSpokes((current) => {
-      if (current.size === beadCount) return current;
-      const next = new Set(current);
-      if (next.size < beadCount) {
-        const candidates = shuffledSpokeIndices(sectionCount).filter(
-          (index) => !next.has(index)
-        );
-        for (
-          let added = 0;
-          next.size < beadCount && added < candidates.length;
-          added += 1
-        ) {
-          next.add(candidates[added]);
-        }
-      } else {
-        const removable = Array.from(next).sort(() => Math.random() - 0.5);
-        for (let removed = 0; next.size > beadCount && removed < removable.length; removed += 1) {
-          next.delete(removable[removed]);
-        }
-      }
-      return next;
-    });
-  }
+  const beadIndexForSpoke = (spokeIndex: number) =>
+    beads.findIndex((bead) => bead.spoke === spokeIndex);
 
-  // Report the actual bead count back up whenever it changes for any reason
-  // (manual clicks, a bead popping, or the section count shrinking).
-  useEffect(() => {
-    onBeadCountChange(activeSpokes.size);
-  }, [activeSpokes, onBeadCountChange]);
+  const noteForSpoke = (spokeIndex: number) => {
+    const beadIndex = beadIndexForSpoke(spokeIndex);
+    return beadIndex >= 0
+      ? beads[beadIndex]?.note ?? noteOptions[0]
+      : scaleNotes[spokeIndex % scaleNotes.length];
+  };
 
-  const noteForSpoke = (spokeIndex: number) =>
-    noteOverrides.get(spokeIndex) ?? noteOptions[spokeIndex % noteOptions.length];
+  const startingPositionForSpoke = (spokeIndex: number): BeadStartingPosition => {
+    const beadIndex = beadIndexForSpoke(spokeIndex);
+    return beadIndex >= 0 ? beads[beadIndex]?.startingPosition ?? "middle" : "middle";
+  };
+
+  const updateBeadAtSpoke = (
+    spokeIndex: number,
+    update: Partial<PatternBead>
+  ) => {
+    const beadIndex = beadIndexForSpoke(spokeIndex);
+    if (beadIndex >= 0) {
+      const nextBeads = beads.map((bead, index) =>
+        index === beadIndex ? { ...bead, ...update } : bead
+      );
+      if (update.note !== undefined) onBeadNoteChange(nextBeads);
+      else onBeadsChange(nextBeads);
+      return;
+    }
+
+    if (beads.length >= sectionCount) return;
+    const nextBeads = [
+      ...beads,
+      {
+        spoke: spokeIndex,
+        startingPosition: update.startingPosition ?? "middle",
+        note: update.note ?? scaleNotes[spokeIndex % scaleNotes.length],
+      },
+    ];
+    if (update.note !== undefined) onBeadNoteChange(nextBeads);
+    else onBeadsChange(nextBeads);
+  };
 
   const sectorAngle = (spokeIndex: number) =>
     (spokeIndex / sectionCount) * Math.PI * 2 + Math.PI / 2;
@@ -344,26 +343,25 @@ export function Wheel({
   };
 
   const toggleBeadAtSpoke = (spokeIndex: number) => {
-    setActiveSpokes((current) => {
-      const next = new Set(current);
-      if (next.has(spokeIndex)) {
-        next.delete(spokeIndex);
-      } else {
-        next.add(spokeIndex);
-      }
-      return next;
-    });
+    const beadIndex = beadIndexForSpoke(spokeIndex);
+    if (beadIndex >= 0) {
+      onBeadsChange(beads.filter((_, index) => index !== beadIndex));
+    } else if (beads.length < sectionCount) {
+      onBeadsChange([
+        ...beads,
+        {
+          spoke: spokeIndex,
+          startingPosition: "middle",
+          note: scaleNotes[spokeIndex % scaleNotes.length],
+        },
+      ]);
+    }
   };
 
   const popRandomBead = () => {
-    setActiveSpokes((current) => {
-      if (current.size === 0) return current;
-      const survivors = Array.from(current);
-      const chosen = survivors[Math.floor(Math.random() * survivors.length)];
-      const next = new Set(current);
-      next.delete(chosen);
-      return next;
-    });
+    if (beads.length === 0) return;
+    const beadIndex = Math.floor(Math.random() * beads.length);
+    onBeadsChange(beads.filter((_, index) => index !== beadIndex));
   };
 
   const handleBeadState = (
@@ -380,9 +378,10 @@ export function Wheel({
       const rotationDelta = delta * spinSpeed * 0.1 * spinDirection;
       wheel.current.rotation.z += rotationDelta;
       spinProgress.current += Math.abs(rotationDelta);
-      while (spinProgress.current >= Math.PI * 2) {
-        spinProgress.current -= Math.PI * 2;
-        onFullSpin();
+      const sectionAngle = (Math.PI * 2) / sectionCount;
+      while (spinProgress.current >= sectionAngle) {
+        spinProgress.current -= sectionAngle;
+        onSectionTurn();
       }
     }
 
@@ -575,27 +574,45 @@ export function Wheel({
               ]}
               center
             >
-              <select
-                autoFocus
-                defaultValue={noteForSpoke(editingSector)}
-                onChange={(event) => {
-                  const spokeIndex = editingSector;
-                  setNoteOverrides((current) => {
-                    const next = new Map(current);
-                    next.set(spokeIndex, event.target.value);
-                    return next;
-                  });
-                  setEditingSector(null);
+              <div
+                onPointerDown={(event) => event.stopPropagation()}
+                style={{
+                  display: "grid",
+                  gap: "5px",
+                  padding: "6px",
+                  background: "rgba(10, 20, 40, 0.95)",
+                  borderRadius: "6px",
                 }}
-                onBlur={() => setEditingSector(null)}
-                style={{ fontSize: "14px", padding: "4px" }}
               >
-                {noteOptions.map((note) => (
-                  <option key={note} value={note}>
-                    {note}
-                  </option>
-                ))}
-              </select>
+                <select
+                  autoFocus
+                  value={noteForSpoke(editingSector)}
+                  onChange={(event) =>
+                    updateBeadAtSpoke(editingSector, { note: event.target.value })
+                  }
+                  style={{ fontSize: "14px", padding: "4px" }}
+                >
+                  {noteOptions.map((note) => (
+                    <option key={note} value={note}>
+                      {note}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={startingPositionForSpoke(editingSector)}
+                  onChange={(event) =>
+                    updateBeadAtSpoke(editingSector, {
+                      startingPosition: event.target.value as BeadStartingPosition,
+                    })
+                  }
+                  style={{ fontSize: "14px", padding: "4px" }}
+                >
+                  <option value="start">Start</option>
+                  <option value="middle">Middle</option>
+                  <option value="end">End</option>
+                </select>
+                <button onClick={() => setEditingSector(null)}>Done</button>
+              </div>
             </Html>
           )}
         </>
@@ -681,26 +698,32 @@ export function Wheel({
         </mesh>
       ))}
 
-      {Array.from(activeSpokes).map((spokeIndex) => (
-        <SpokeBead
-          key={spokeIndex}
-          wheel={wheel}
-          spokeAngle={(spokeIndex / sectionCount) * Math.PI * 2}
-          initialDistance={BEAD_DROP_DISTANCE}
-          note={noteForSpoke(spokeIndex)}
-          audioEngine={audioEngine}
-          beadIndex={spokeIndex}
-          suppressSoundsUntil={suppressSoundsUntil}
-          hubRadius={hubRadius}
-          hubPhase={hubPhase}
-          onHubHit={() => {
-            flashHub();
-            flashSector(spokeIndex);
-          }}
-          onRimHit={() => flashSector(spokeIndex)}
-          onStateChange={handleBeadState}
-        />
-      ))}
+      {beads.map((bead) => {
+        const spokeIndex = bead.spoke;
+        return (
+          <SpokeBead
+            key={spokeIndex}
+            wheel={wheel}
+            spokeAngle={(spokeIndex / sectionCount) * Math.PI * 2}
+            initialDistance={getStartingDistance(
+              bead.startingPosition,
+              HUB_BASE_RADIUS
+            )}
+            note={bead.note}
+            audioEngine={audioEngine}
+            beadIndex={spokeIndex}
+            suppressSoundsUntil={suppressSoundsUntil}
+            hubRadius={hubRadius}
+            hubPhase={hubPhase}
+            onHubHit={() => {
+              flashHub();
+              flashSector(spokeIndex);
+            }}
+            onRimHit={() => flashSector(spokeIndex)}
+            onStateChange={handleBeadState}
+          />
+        );
+      })}
 
       <mesh ref={hubMesh} position={[0, 0, 0.12]} rotation={[Math.PI / 2, 0, 0]}>
         <cylinderGeometry args={[0.42, 0.42, 0.3, 6]} />

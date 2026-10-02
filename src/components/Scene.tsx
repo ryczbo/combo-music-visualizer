@@ -2,18 +2,26 @@ import { OrbitControls } from "@react-three/drei";
 import { AudioEngine } from "../services/audioEngine";
 import { Wheel } from "./Wheel";
 
+type PatternBead = {
+  spoke: number;
+  startingPosition: "start" | "middle" | "end";
+  note: string;
+};
+
 type SceneProps = {
   spinning: boolean;
   spinDirection: 1 | -1;
   spinSpeed: number;
   audioEngine: AudioEngine;
   noteOptions: string[];
+  scaleNotes: string[];
   inflateHeld: boolean;
   showOuterRing: boolean;
   sectionCount: number;
-  beadCount: number;
-  onBeadCountChange: (count: number) => void;
-  onFullSpin: () => void;
+  beads: PatternBead[];
+  onBeadsChange: (beads: PatternBead[]) => void;
+  onBeadNoteChange: (beads: PatternBead[]) => void;
+  onSectionTurn: () => void;
 };
 
 export function Scene({
@@ -22,12 +30,14 @@ export function Scene({
   spinSpeed,
   audioEngine,
   noteOptions,
+  scaleNotes,
   inflateHeld,
   showOuterRing,
   sectionCount,
-  beadCount,
-  onBeadCountChange,
-  onFullSpin,
+  beads,
+  onBeadsChange,
+  onBeadNoteChange,
+  onSectionTurn,
 }: SceneProps) {
   return (
     <>
@@ -48,12 +58,14 @@ export function Scene({
         spinSpeed={spinSpeed}
         audioEngine={audioEngine}
         noteOptions={noteOptions}
+        scaleNotes={scaleNotes}
         inflateHeld={inflateHeld}
         showOuterRing={showOuterRing}
         sectionCount={sectionCount}
-        beadCount={beadCount}
-        onBeadCountChange={onBeadCountChange}
-        onFullSpin={onFullSpin}
+        beads={beads}
+        onBeadsChange={onBeadsChange}
+        onBeadNoteChange={onBeadNoteChange}
+        onSectionTurn={onSectionTurn}
       />
 
       <OrbitControls target={[0, 0, 0]} enablePan={false} />
