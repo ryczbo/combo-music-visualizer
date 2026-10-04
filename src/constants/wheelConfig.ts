@@ -14,6 +14,9 @@ export type WheelConfig = {
   sectionCount: number;
   beads: PatternBead[];
   scaleName: ScaleName;
+  // Notes pinned for the sectors after a hand edit, so switching to the custom
+  // scale doesn't relabel them; cleared whenever a scale is picked.
+  sectorNotes?: string[];
   volume: number;
   tone: number;
   reverb: number;
@@ -172,6 +175,7 @@ export function scalePatch(
   const scaleNotes = getScaleNoteNames(scaleName);
   return {
     scaleName,
+    sectorNotes: undefined,
     beads: config.beads.map((bead, index) => ({
       ...bead,
       note: scaleNotes[index % scaleNotes.length],

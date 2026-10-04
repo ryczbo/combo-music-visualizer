@@ -231,13 +231,13 @@ export default function App() {
 
   // Editing a note by hand leaves the scale, so the picker shows the custom range.
   const updateBeadNote = (beads: PatternBead[]) =>
-    updateFirstWheel({ beads, scaleName: "custom" });
+    updateFirstWheel({ beads, scaleName: "custom", sectorNotes: scaleNotes });
 
   useWheelAudio(audioEngine, settings);
   useDrumAudio(drumEngine, settings.secondWheel);
 
   const noteOptions = Object.keys(SCALES.custom);
-  const scaleNotes = getScaleNoteNames(settings.scaleName);
+  const scaleNotes = settings.sectorNotes ?? getScaleNoteNames(settings.scaleName);
 
   return (
     <>
