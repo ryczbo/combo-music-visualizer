@@ -413,7 +413,10 @@ export default function App() {
       >
         Import settings
       </button>
+      </>
+      )}
       <CameraControls
+        visible={controlsVisible}
         onCommand={setCameraCommand}
         getSoundValue={(target) => sounds.blue[target]}
         onSoundChange={(target, value) =>
@@ -423,8 +426,6 @@ export default function App() {
           }))
         }
       />
-      </>
-      )}
       <input
         ref={importInputRef}
         type="file"

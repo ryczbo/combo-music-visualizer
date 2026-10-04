@@ -11,6 +11,8 @@ import {
 } from "../constants/cameraMoves";
 
 type CameraControlsProps = {
+  // Hidden panels stay mounted so settings and running animations survive.
+  visible: boolean;
   onCommand: (command: CameraCommand) => void;
   getSoundValue: (target: ModulationTarget) => number;
   onSoundChange: (target: ModulationTarget, value: number) => void;
@@ -45,6 +47,7 @@ const cardStyle: CSSProperties = {
 const fullWidth: CSSProperties = { width: "100%" };
 
 export function CameraControls({
+  visible,
   onCommand,
   getSoundValue,
   onSoundChange,
@@ -153,7 +156,7 @@ export function CameraControls({
         position: "fixed",
         top: "220px",
         right: "20px",
-        display: "flex",
+        display: visible ? "flex" : "none",
         flexDirection: "column",
         gap: "6px",
         width: "210px",

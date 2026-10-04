@@ -1,0 +1,366 @@
+{
+  "patterns": [
+    {
+      "sectionCount": 20,
+      "beads": [
+        {
+          "spoke": 0,
+          "note": "E3"
+        },
+        {
+          "spoke": 1,
+          "note": "F3"
+        },
+        {
+          "spoke": 2,
+          "note": "G#3"
+        },
+        {
+          "spoke": 3,
+          "note": "A3"
+        },
+        {
+          "spoke": 4,
+          "note": "B3"
+        },
+        {
+          "spoke": 5,
+          "note": "C4"
+        },
+        {
+          "spoke": 6,
+          "note": "D4"
+        },
+        {
+          "spoke": 7,
+          "note": "E4"
+        },
+        {
+          "spoke": 8,
+          "note": "F4"
+        },
+        {
+          "spoke": 9,
+          "note": "G#4"
+        },
+        {
+          "spoke": 10,
+          "note": "A4"
+        },
+        {
+          "spoke": 11,
+          "note": "B4"
+        },
+        {
+          "spoke": 12,
+          "note": "C5"
+        },
+        {
+          "spoke": 13,
+          "note": "D5"
+        },
+        {
+          "spoke": 14,
+          "note": "E5"
+        },
+        {
+          "spoke": 15,
+          "note": "F5"
+        },
+        {
+          "spoke": 16,
+          "note": "G#5"
+        },
+        {
+          "spoke": 17,
+          "note": "A5"
+        },
+        {
+          "spoke": 18,
+          "note": "B5"
+        },
+        {
+          "spoke": 19,
+          "note": "C6"
+        }
+      ],
+      "scaleName": "ePhrygianDominant",
+      "active": true,
+      "length": 20,
+      "spinDirection": -1,
+      "spinSpeed": 12,
+      "secondWheel": {
+        "sectionCount": 8,
+        "beads": [
+          {
+            "spoke": 0,
+            "note": "Kick"
+          },
+          {
+            "spoke": 1,
+            "note": "Snare"
+          },
+          {
+            "spoke": 2,
+            "note": "Hihat"
+          },
+          {
+            "spoke": 3,
+            "note": "Crash"
+          }
+        ],
+        "scaleName": "ePhrygianDominant"
+      }
+    },
+    {
+      "sectionCount": 20,
+      "beads": [
+        {
+          "spoke": 0,
+          "note": "E3"
+        },
+        {
+          "spoke": 1,
+          "note": "F3"
+        },
+        {
+          "spoke": 2,
+          "note": "G#3"
+        },
+        {
+          "spoke": 3,
+          "note": "A3"
+        },
+        {
+          "spoke": 4,
+          "note": "B3"
+        },
+        {
+          "spoke": 5,
+          "note": "C4"
+        },
+        {
+          "spoke": 6,
+          "note": "D4"
+        },
+        {
+          "spoke": 7,
+          "note": "E4"
+        },
+        {
+          "spoke": 8,
+          "note": "F4"
+        },
+        {
+          "spoke": 9,
+          "note": "G#4"
+        },
+        {
+          "spoke": 10,
+          "note": "A4"
+        },
+        {
+          "spoke": 11,
+          "note": "B4"
+        },
+        {
+          "spoke": 12,
+          "note": "C5"
+        },
+        {
+          "spoke": 13,
+          "note": "D5"
+        },
+        {
+          "spoke": 14,
+          "note": "E5"
+        },
+        {
+          "spoke": 15,
+          "note": "F5"
+        },
+        {
+          "spoke": 16,
+          "note": "G#5"
+        },
+        {
+          "spoke": 17,
+          "note": "A5"
+        },
+        {
+          "spoke": 18,
+          "note": "B5"
+        },
+        {
+          "spoke": 19,
+          "note": "C6"
+        }
+      ],
+      "scaleName": "ePhrygianDominant",
+      "active": true,
+      "length": 20,
+      "spinDirection": -1,
+      "spinSpeed": 8,
+      "secondWheel": {
+        "sectionCount": 8,
+        "beads": [
+          {
+            "spoke": 0,
+            "note": "Kick"
+          },
+          {
+            "spoke": 1,
+            "note": "Snare"
+          },
+          {
+            "spoke": 2,
+            "note": "Hihat"
+          },
+          {
+            "spoke": 3,
+            "note": "Crash"
+          }
+        ],
+        "scaleName": "ePhrygianDominant"
+      }
+    },
+    {
+      "sectionCount": 20,
+      "beads": [
+        {
+          "spoke": 0,
+          "note": "E3"
+        },
+        {
+          "spoke": 1,
+          "note": "F3"
+        },
+        {
+          "spoke": 2,
+          "note": "G#3"
+        },
+        {
+          "spoke": 3,
+          "note": "A3"
+        },
+        {
+          "spoke": 4,
+          "note": "B3"
+        },
+        {
+          "spoke": 5,
+          "note": "C4"
+        },
+        {
+          "spoke": 6,
+          "note": "D4"
+        },
+        {
+          "spoke": 7,
+          "note": "E4"
+        },
+        {
+          "spoke": 8,
+          "note": "F4"
+        },
+        {
+          "spoke": 9,
+          "note": "G#4"
+        },
+        {
+          "spoke": 10,
+          "note": "A4"
+        },
+        {
+          "spoke": 11,
+          "note": "B4"
+        },
+        {
+          "spoke": 12,
+          "note": "C5"
+        },
+        {
+          "spoke": 13,
+          "note": "D5"
+        },
+        {
+          "spoke": 14,
+          "note": "E5"
+        },
+        {
+          "spoke": 15,
+          "note": "F5"
+        },
+        {
+          "spoke": 16,
+          "note": "G#5"
+        },
+        {
+          "spoke": 17,
+          "note": "A5"
+        },
+        {
+          "spoke": 18,
+          "note": "B5"
+        },
+        {
+          "spoke": 19,
+          "note": "C6"
+        }
+      ],
+      "scaleName": "ePhrygianDominant",
+      "active": true,
+      "length": 20,
+      "spinDirection": -1,
+      "spinSpeed": 8,
+      "secondWheel": {
+        "sectionCount": 8,
+        "beads": [
+          {
+            "spoke": 0,
+            "note": "Kick"
+          },
+          {
+            "spoke": 1,
+            "note": "Snare"
+          },
+          {
+            "spoke": 2,
+            "note": "Hihat"
+          },
+          {
+            "spoke": 3,
+            "note": "Crash"
+          }
+        ],
+        "scaleName": "ePhrygianDominant"
+      }
+    }
+  ],
+  "sounds": {
+    "blue": {
+      "volume": 0.8,
+      "tone": 0,
+      "reverb": 0.24,
+      "sustain": 0.5,
+      "ringModulation": 0,
+      "oscillatorType": "sine",
+      "filterType": "lowpass",
+      "filterFrequency": 12000,
+      "lfoType": "sine",
+      "lfoRate": 0
+    },
+    "pink": {
+      "volume": 0.8,
+      "tone": 1,
+      "reverb": 0.24,
+      "sustain": 0.5,
+      "ringModulation": 0,
+      "oscillatorType": "sine",
+      "filterType": "lowpass",
+      "filterFrequency": 12000,
+      "lfoType": "sine",
+      "lfoRate": 0
+    }
+  }
+}
