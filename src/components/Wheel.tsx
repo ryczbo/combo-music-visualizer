@@ -34,6 +34,7 @@ type WheelProps = {
   onBeadNoteChange: (beads: PatternBead[]) => void;
   onSectionTurn: () => void;
   theme: WheelTheme;
+  beadColor: string;
   position?: [number, number, number];
   scale?: number;
   // Spin rate relative to the spin speed setting; negative turns the other way.
@@ -45,6 +46,7 @@ type SpokeBeadProps = {
   spokeAngle: number;
   initialDistance: number;
   note: string;
+  color: string;
   // Inactive beads still move with the wheel but are silent and never light up.
   active: boolean;
   audioEngine: NotePlayer;
@@ -85,14 +87,13 @@ const WALL_PROFILE = [
   new THREE.Vector2(WALL_INNER_RADIUS, -WALL_DEPTH / 2),
 ];
 
-const SPOKE_BEAD_COLOR = new THREE.Color("#f2f7c9");
-const SPOKE_BEAD_EMISSIVE = new THREE.Color("#e8f27a");
 
 function SpokeBead({
   wheel,
   spokeAngle,
   initialDistance,
   note,
+  color,
   active,
   audioEngine,
   beadIndex,
@@ -203,8 +204,8 @@ function SpokeBead({
         <sphereGeometry args={[BEAD_RADIUS, 20, 20]} />
         <meshStandardMaterial
           ref={beadMaterial}
-          color="#6b5900"
-          emissive="#8a7000"
+          color={color}
+          emissive={color}
           emissiveIntensity={0}
           transparent
           opacity={0.5}
@@ -231,11 +232,20 @@ export function Wheel({
   onBeadNoteChange,
   onSectionTurn,
   theme,
+  beadColor,
   position = [0, 0, 0],
   scale = 1,
   rotationRatio = 1,
 }: WheelProps) {
   const wheel = useRef<THREE.Group>(null);
+  // Spokes with an active bead glow in a lighter shade of the bead color.
+  const spokeHighlight = useMemo(
+    () => ({
+      color: new THREE.Color(beadColor).offsetHSL(0, 0, 0.3),
+      emissive: new THREE.Color(beadColor),
+    }),
+    [beadColor]
+  );
   // Accumulated rotation toward the next section boundary.
   const spinProgress = useRef(0);
   const activeSpokes = useMemo(
@@ -408,8 +418,8 @@ export function Wheel({
       const spokeMaterial = spokeMaterials.current[index];
       if (spokeMaterial) {
         const hasBead = activeSpokes.has(index);
-        spokeMaterial.color.copy(hasBead ? SPOKE_BEAD_COLOR : theme.spoke);
-        spokeMaterial.emissive.copy(hasBead ? SPOKE_BEAD_EMISSIVE : theme.spokeEmissive);
+        spokeMaterial.color.copy(hasBead ? spokeHighlight.color : theme.spoke);
+        spokeMaterial.emissive.copy(hasBead ? spokeHighlight.emissive : theme.spokeEmissive);
       }
     }
 
@@ -681,6 +691,7 @@ export function Wheel({
             spokeAngle={(spokeIndex / sectionCount) * Math.PI * 2}
             initialDistance={BEAD_DROP_DISTANCE}
             note={noteForSpoke(spokeIndex)}
+            color={beadColor}
             active={bead !== undefined}
             audioEngine={audioEngine}
             beadIndex={spokeIndex}

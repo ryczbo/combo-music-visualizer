@@ -37,33 +37,32 @@ export type WheelTheme = {
   spokeEmissive: THREE.Color;
 };
 
-const createTheme = (colors: Record<keyof WheelTheme, string>): WheelTheme =>
-  Object.fromEntries(
-    Object.entries(colors).map(([key, value]) => [key, new THREE.Color(value)])
-  ) as WheelTheme;
+export const DEFAULT_COLORS = {
+  blue: "#2f6690",
+  pink: "#d94f9a",
+  background: "#111111",
+  beads: "#a88a00",
+};
 
-// Sector base color matches the collision flash hue; hover uses a distinct
-// color so the two kinds of light-up never look the same.
-export const BLUE_WHEEL_THEME = createTheme({
-  wall: "#0a1a3c",
-  wallEmissive: "#2f6690",
-  outerRing: "#08132e",
-  outerRingEmissive: "#1c3f66",
-  sector: "#123a5e",
-  sectorEmissive: "#1c4f7c",
-  sectorHoverEmissive: "#35e0c2",
-  spoke: "#123a5e",
-  spokeEmissive: "#1c4f7c",
-});
+// Builds the whole wheel palette from one color: its hue and saturation are
+// reused at fixed lightness steps. The sector hover glow is shifted in hue so
+// it never looks like the collision flash.
+export function createWheelTheme(baseColor: string): WheelTheme {
+  const base = new THREE.Color(baseColor);
+  const { h, s } = base.getHSL({ h: 0, s: 0, l: 0 }, THREE.SRGBColorSpace);
+  const saturation = Math.min(0.85, Math.max(0.5, s));
+  const shade = (lightness: number, hue = h, sat = saturation) =>
+    new THREE.Color().setHSL(hue, sat, lightness, THREE.SRGBColorSpace);
 
-export const PINK_WHEEL_THEME = createTheme({
-  wall: "#3c0a2a",
-  wallEmissive: "#d94f9a",
-  outerRing: "#2e0820",
-  outerRingEmissive: "#8a2a62",
-  sector: "#5e1245",
-  sectorEmissive: "#a81f6e",
-  sectorHoverEmissive: "#ffb3e0",
-  spoke: "#5e1245",
-  spokeEmissive: "#a81f6e",
-});
+  return {
+    wall: shade(0.15),
+    wallEmissive: base,
+    outerRing: shade(0.1),
+    outerRingEmissive: shade(0.26),
+    sector: shade(0.22),
+    sectorEmissive: shade(0.3),
+    sectorHoverEmissive: shade(0.6, (h + 1 - 35 / 360) % 1, 0.75),
+    spoke: shade(0.22),
+    spokeEmissive: shade(0.3),
+  };
+}

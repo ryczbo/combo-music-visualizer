@@ -1,4 +1,4 @@
-import { useRef, useState, type CSSProperties } from "react";
+import { useMemo, useRef, useState, type CSSProperties } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Scene } from "./components/Scene";
 import { CameraControls } from "./components/CameraControls";
@@ -22,6 +22,7 @@ import {
   type WheelSound,
 } from "./constants/wheelConfig";
 import { useDrumAudio, useWheelAudio } from "./hooks/useWheelAudio";
+import { DEFAULT_COLORS, createWheelTheme } from "./constants/wheelLayout";
 
 const audioEngine = new AudioEngine();
 // The second wheel has its own audio chain so its sound options are independent.
@@ -89,11 +90,14 @@ export default function App() {
   }));
 
   const settings = patternSettings[activePattern];
+  const [colors, setColors] = useState(DEFAULT_COLORS);
+  const blueTheme = useMemo(() => createWheelTheme(colors.blue), [colors.blue]);
+  const pinkTheme = useMemo(() => createWheelTheme(colors.pink), [colors.pink]);
   const blueControls: WheelControlValues = { ...settings, ...sounds.blue };
   const pinkControls: WheelControlValues = { ...settings.secondWheel, ...sounds.pink };
 
   const exportSettings = () => {
-    const blob = new Blob([JSON.stringify({ patterns: patternSettings, sounds }, null, 2)], {
+    const blob = new Blob([JSON.stringify({ patterns: patternSettings, sounds, colors }, null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
@@ -121,6 +125,7 @@ export default function App() {
         blue: normalizeWheelSound(savedSounds?.blue),
         pink: normalizeWheelSound(savedSounds?.pink),
       });
+      if (!Array.isArray(parsed)) setColors({ ...DEFAULT_COLORS, ...parsed.colors });
       setPatternSettings(
         patterns.map((pattern) => {
           const defaults = createDefaultWheelSettings();
@@ -270,7 +275,7 @@ export default function App() {
         style={{
           width: "100vw",
           height: "100vh",
-          background: "#111111",
+          background: colors.background,
         }}
       >
         <Scene
@@ -287,6 +292,9 @@ export default function App() {
           onBeadsChange={updateBeads}
           onBeadNoteChange={updateBeadNote}
           onSectionTurn={handleSectionTurn}
+          blueTheme={blueTheme}
+          pinkTheme={pinkTheme}
+          beadColor={colors.beads}
           secondWheel={
             secondWheelEnabled
               ? {
@@ -571,6 +579,30 @@ export default function App() {
             onSpeedChange: updateSpinSpeed,
           }}
         />
+
+        <strong>Colors</strong>
+        {(
+          [
+            ["blue", "Blue wheel"],
+            ["pink", "Pink wheel"],
+            ["background", "Background"],
+            ["beads", "Beads"],
+          ] as const
+        ).map(([key, label]) => (
+          <label
+            key={key}
+            style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}
+          >
+            {label}
+            <input
+              type="color"
+              value={colors[key]}
+              onChange={(event) =>
+                setColors((current) => ({ ...current, [key]: event.target.value }))
+              }
+            />
+          </label>
+        ))}
       </div>
       )}
 

@@ -5,11 +5,10 @@ import { CAMERA_TARGET, type CameraCommand } from "../constants/cameraMoves";
 import { CameraRig } from "./CameraRig";
 import { Wheel } from "./Wheel";
 import {
-  BLUE_WHEEL_THEME,
-  PINK_WHEEL_THEME,
   SECOND_WHEEL_POSITION,
   SECOND_WHEEL_ROTATION_RATIO,
   SECOND_WHEEL_SCALE,
+  type WheelTheme,
 } from "../constants/wheelLayout";
 
 type PatternBead = {
@@ -41,6 +40,9 @@ type SceneProps = {
   onBeadsChange: (beads: PatternBead[]) => void;
   onBeadNoteChange: (beads: PatternBead[]) => void;
   onSectionTurn: () => void;
+  blueTheme: WheelTheme;
+  pinkTheme: WheelTheme;
+  beadColor: string;
   secondWheel: SecondWheelProps | null;
   cameraCommand: CameraCommand | null;
 };
@@ -59,6 +61,9 @@ export function Scene({
   onBeadsChange,
   onBeadNoteChange,
   onSectionTurn,
+  blueTheme,
+  pinkTheme,
+  beadColor,
   secondWheel,
   cameraCommand,
 }: SceneProps) {
@@ -89,7 +94,8 @@ export function Scene({
         onBeadsChange={onBeadsChange}
         onBeadNoteChange={onBeadNoteChange}
         onSectionTurn={onSectionTurn}
-        theme={BLUE_WHEEL_THEME}
+        theme={blueTheme}
+        beadColor={beadColor}
       />
 
       {secondWheel && (
@@ -108,7 +114,8 @@ export function Scene({
           onBeadNoteChange={secondWheel.onBeadNoteChange}
           // Pattern progress follows the first wheel only.
           onSectionTurn={() => {}}
-          theme={PINK_WHEEL_THEME}
+          theme={pinkTheme}
+          beadColor={beadColor}
           position={SECOND_WHEEL_POSITION}
           scale={SECOND_WHEEL_SCALE}
           rotationRatio={SECOND_WHEEL_ROTATION_RATIO}

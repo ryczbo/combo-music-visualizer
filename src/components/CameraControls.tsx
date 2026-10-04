@@ -126,6 +126,24 @@ export function CameraControls({
     startModulations(steps);
   };
 
+  // Lets the K key start the animations while the menus are hidden.
+  const startSelectedRef = useRef(startSelected);
+  useEffect(() => {
+    startSelectedRef.current = startSelected;
+  });
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "k" || event.repeat) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const typing = (event.target as HTMLElement).closest(
+        "select, textarea, input[type=text], input[type=number]"
+      );
+      if (!typing) startSelectedRef.current();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const reset = () => {
     cancelAnimationFrame(modulationFrame.current);
     sendCommand([{ move: "reset", ...moveSettings.reset }]);
