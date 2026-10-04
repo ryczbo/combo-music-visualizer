@@ -1,11 +1,31 @@
 import { OrbitControls } from "@react-three/drei";
 import { AudioEngine } from "../services/audioEngine";
+import type { NotePlayer } from "../services/notePlayer";
+import { CAMERA_TARGET, type CameraCommand } from "../constants/cameraMoves";
+import { CameraRig } from "./CameraRig";
 import { Wheel } from "./Wheel";
+import {
+  BLUE_WHEEL_THEME,
+  PINK_WHEEL_THEME,
+  SECOND_WHEEL_POSITION,
+  SECOND_WHEEL_ROTATION_RATIO,
+  SECOND_WHEEL_SCALE,
+} from "../constants/wheelLayout";
 
 type PatternBead = {
   spoke: number;
   startingPosition: "start" | "middle" | "end";
   note: string;
+};
+
+type SecondWheelProps = {
+  audioEngine: NotePlayer;
+  noteOptions: string[];
+  scaleNotes: string[];
+  sectionCount: number;
+  beads: PatternBead[];
+  onBeadsChange: (beads: PatternBead[]) => void;
+  onBeadNoteChange: (beads: PatternBead[]) => void;
 };
 
 type SceneProps = {
@@ -22,6 +42,8 @@ type SceneProps = {
   onBeadsChange: (beads: PatternBead[]) => void;
   onBeadNoteChange: (beads: PatternBead[]) => void;
   onSectionTurn: () => void;
+  secondWheel: SecondWheelProps | null;
+  cameraCommand: CameraCommand | null;
 };
 
 export function Scene({
@@ -38,6 +60,8 @@ export function Scene({
   onBeadsChange,
   onBeadNoteChange,
   onSectionTurn,
+  secondWheel,
+  cameraCommand,
 }: SceneProps) {
   return (
     <>
@@ -66,9 +90,34 @@ export function Scene({
         onBeadsChange={onBeadsChange}
         onBeadNoteChange={onBeadNoteChange}
         onSectionTurn={onSectionTurn}
+        theme={BLUE_WHEEL_THEME}
       />
 
-      <OrbitControls target={[0, 0, 0]} enablePan={false} />
+      {secondWheel && (
+        <Wheel
+          spinning={spinning}
+          spinDirection={spinDirection}
+          spinSpeed={spinSpeed}
+          audioEngine={secondWheel.audioEngine}
+          noteOptions={secondWheel.noteOptions}
+          scaleNotes={secondWheel.scaleNotes}
+          inflateHeld={inflateHeld}
+          showOuterRing={showOuterRing}
+          sectionCount={secondWheel.sectionCount}
+          beads={secondWheel.beads}
+          onBeadsChange={secondWheel.onBeadsChange}
+          onBeadNoteChange={secondWheel.onBeadNoteChange}
+          // Pattern progress follows the first wheel only.
+          onSectionTurn={() => {}}
+          theme={PINK_WHEEL_THEME}
+          position={SECOND_WHEEL_POSITION}
+          scale={SECOND_WHEEL_SCALE}
+          rotationRatio={SECOND_WHEEL_ROTATION_RATIO}
+        />
+      )}
+
+      <OrbitControls makeDefault target={CAMERA_TARGET} enablePan={false} />
+      <CameraRig command={cameraCommand} />
     </>
   );
 }

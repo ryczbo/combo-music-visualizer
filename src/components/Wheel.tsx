@@ -2,7 +2,17 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Html, Text } from "@react-three/drei";
 import * as THREE from "three";
-import { AudioEngine } from "../services/audioEngine";
+import type { NotePlayer } from "../services/notePlayer";
+import {
+  BEAD_RADIUS,
+  OUTER_RING_INNER_RADIUS,
+  OUTER_RING_OUTER_RADIUS,
+  OUTER_RING_RADIUS,
+  RIM_RADIUS,
+  WHEEL_OUTER_RADIUS,
+  WHEEL_RADIUS,
+  type WheelTheme,
+} from "../constants/wheelLayout";
 
 type BeadStartingPosition = "start" | "middle" | "end";
 
@@ -16,7 +26,7 @@ type WheelProps = {
   spinning: boolean;
   spinDirection: 1 | -1;
   spinSpeed: number;
-  audioEngine: AudioEngine;
+  audioEngine: NotePlayer;
   noteOptions: string[];
   scaleNotes: string[];
   inflateHeld: boolean;
@@ -26,6 +36,11 @@ type WheelProps = {
   onBeadsChange: (beads: PatternBead[]) => void;
   onBeadNoteChange: (beads: PatternBead[]) => void;
   onSectionTurn: () => void;
+  theme: WheelTheme;
+  position?: [number, number, number];
+  scale?: number;
+  // Spin rate relative to the spin speed setting; negative turns the other way.
+  rotationRatio?: number;
 };
 
 type SpokeBeadProps = {
@@ -33,7 +48,7 @@ type SpokeBeadProps = {
   spokeAngle: number;
   initialDistance: number;
   note: string;
-  audioEngine: AudioEngine;
+  audioEngine: NotePlayer;
   beadIndex: number;
   suppressSoundsUntil: RefObject<number>;
   hubRadius: RefObject<number>;
@@ -47,10 +62,8 @@ type SpokeBeadProps = {
   ) => { distance: number; velocity: number } | undefined;
 };
 
-const WHEEL_RADIUS = 4;
 const SPOKE_START = 0.35;
 const SPOKE_LENGTH = WHEEL_RADIUS - 0.7;
-const BEAD_RADIUS = 0.16;
 // Where a newly toggled-on bead drops in from along its spoke.
 const BEAD_DROP_DISTANCE = SPOKE_START + SPOKE_LENGTH * 0.5;
 const HUB_BASE_RADIUS = 0.42;
@@ -61,14 +74,17 @@ const HUB_DEFLATE_SPEED = 1.4;
 const HUB_CONTACT_OFFSET = SPOKE_START + 0.15 - HUB_BASE_RADIUS;
 // Extra outward speed given to a bead per multiple of the hub's resting size, while expanding.
 const HUB_PUSH_STRENGTH = 2.5;
-const RIM_RADIUS = WHEEL_RADIUS - 0.28;
-const RIM_TUBE = 0.045;
-// Outer ring band is four times as wide as before, with squared (flat) edges
-// instead of a rounded tube, set apart from the rim by a bead-radius gap.
-const OUTER_RING_WIDTH = 0.09 * 2 * 4;
-const OUTER_RING_RADIUS = RIM_RADIUS + RIM_TUBE + BEAD_RADIUS + OUTER_RING_WIDTH / 2;
-const OUTER_RING_INNER_RADIUS = OUTER_RING_RADIUS - OUTER_RING_WIDTH / 2;
-const OUTER_RING_OUTER_RADIUS = OUTER_RING_RADIUS + OUTER_RING_WIDTH / 2;
+// The wall is as thick (deep) as the hub; its inner face is where beads bounce.
+const WALL_DEPTH = 0.3;
+const WALL_INNER_RADIUS = SPOKE_START + SPOKE_LENGTH;
+const WALL_OUTER_RADIUS = WHEEL_OUTER_RADIUS;
+const WALL_PROFILE = [
+  new THREE.Vector2(WALL_INNER_RADIUS, -WALL_DEPTH / 2),
+  new THREE.Vector2(WALL_OUTER_RADIUS, -WALL_DEPTH / 2),
+  new THREE.Vector2(WALL_OUTER_RADIUS, WALL_DEPTH / 2),
+  new THREE.Vector2(WALL_INNER_RADIUS, WALL_DEPTH / 2),
+  new THREE.Vector2(WALL_INNER_RADIUS, -WALL_DEPTH / 2),
+];
 
 function getStartingDistance(
   startingPosition: BeadStartingPosition,
@@ -83,12 +99,6 @@ function getStartingDistance(
   return BEAD_DROP_DISTANCE;
 }
 
-// Sector base color matches the collision flash hue; hover uses a distinct teal so
-// the two kinds of light-up never look the same.
-const SECTOR_BASE_EMISSIVE = new THREE.Color("#1c4f7c");
-const SECTOR_HOVER_EMISSIVE = new THREE.Color("#35e0c2");
-const SPOKE_BASE_COLOR = new THREE.Color("#123a5e");
-const SPOKE_BASE_EMISSIVE = new THREE.Color("#1c4f7c");
 const SPOKE_BEAD_COLOR = new THREE.Color("#f2f7c9");
 const SPOKE_BEAD_EMISSIVE = new THREE.Color("#e8f27a");
 
@@ -231,6 +241,10 @@ export function Wheel({
   onBeadsChange,
   onBeadNoteChange,
   onSectionTurn,
+  theme,
+  position = [0, 0, 0],
+  scale = 1,
+  rotationRatio = 1,
 }: WheelProps) {
   const wheel = useRef<THREE.Group>(null);
   // Accumulated rotation toward the next section boundary.
@@ -375,7 +389,8 @@ export function Wheel({
 
   useFrame((_, delta) => {
     if (wheel.current && spinning) {
-      const rotationDelta = delta * spinSpeed * 0.1 * spinDirection;
+      const rotationDelta =
+        delta * spinSpeed * 0.1 * spinDirection * rotationRatio;
       wheel.current.rotation.z += rotationDelta;
       spinProgress.current += Math.abs(rotationDelta);
       const sectionAngle = (Math.PI * 2) / sectionCount;
@@ -395,8 +410,8 @@ export function Wheel({
         const isHovered = hoveredSector.current === index;
         const hoverAmount = isPressed ? 1 : isHovered ? 0.55 : 0;
         material.emissive.lerpColors(
-          SECTOR_BASE_EMISSIVE,
-          SECTOR_HOVER_EMISSIVE,
+          theme.sectorEmissive,
+          theme.sectorHoverEmissive,
           hoverAmount
         );
         material.emissiveIntensity =
@@ -410,8 +425,8 @@ export function Wheel({
         const isHovered = hoveredSector.current === index;
         const hoverAmount = isPressed ? 1 : isHovered ? 0.55 : 0;
         outerMaterial.emissive.lerpColors(
-          SECTOR_BASE_EMISSIVE,
-          SECTOR_HOVER_EMISSIVE,
+          theme.sectorEmissive,
+          theme.sectorHoverEmissive,
           hoverAmount
         );
         outerMaterial.emissiveIntensity =
@@ -422,8 +437,8 @@ export function Wheel({
       const spokeMaterial = spokeMaterials.current[index];
       if (spokeMaterial) {
         const hasBead = activeSpokes.has(index);
-        spokeMaterial.color.copy(hasBead ? SPOKE_BEAD_COLOR : SPOKE_BASE_COLOR);
-        spokeMaterial.emissive.copy(hasBead ? SPOKE_BEAD_EMISSIVE : SPOKE_BASE_EMISSIVE);
+        spokeMaterial.color.copy(hasBead ? SPOKE_BEAD_COLOR : theme.spoke);
+        spokeMaterial.emissive.copy(hasBead ? SPOKE_BEAD_EMISSIVE : theme.spokeEmissive);
       }
     }
 
@@ -462,18 +477,19 @@ export function Wheel({
   });
 
   return (
-    <group ref={wheel}>
-      {/* Thin bioluminescent rim, translucent like a ctenophore's edge. */}
-      <mesh>
-        <torusGeometry args={[RIM_RADIUS, RIM_TUBE, 6, 48]} />
+    <group ref={wheel} position={position} scale={scale}>
+      {/* Solid wall as deep as the hub, so beads visibly hit it. */}
+      <mesh position={[0, 0, 0.12]} rotation={[Math.PI / 2, 0, 0]}>
+        <latheGeometry args={[WALL_PROFILE, 96]} />
         <meshStandardMaterial
-          color="#0a1a3c"
-          emissive="#2f6690"
+          color={theme.wall}
+          emissive={theme.wallEmissive}
           emissiveIntensity={0.6}
           transparent
-          opacity={0.55}
+          opacity={0.8}
           roughness={0.35}
           metalness={0.2}
+          side={THREE.DoubleSide}
         />
       </mesh>
 
@@ -485,8 +501,8 @@ export function Wheel({
               args={[OUTER_RING_INNER_RADIUS, OUTER_RING_OUTER_RADIUS, 64]}
             />
             <meshStandardMaterial
-              color="#08132e"
-              emissive="#1c3f66"
+              color={theme.outerRing}
+              emissive={theme.outerRingEmissive}
               emissiveIntensity={0.6}
               transparent
               opacity={0.55}
@@ -532,8 +548,8 @@ export function Wheel({
                 ref={(material) => {
                   outerSectorMaterials.current[index] = material;
                 }}
-                color="#08132e"
-                emissive="#1c3f66"
+                color={theme.outerRing}
+                emissive={theme.outerRingEmissive}
                 emissiveIntensity={0.5}
                 transparent
                 opacity={0.15}
@@ -555,7 +571,7 @@ export function Wheel({
                   OUTER_RING_RADIUS * Math.sin(angle),
                   0.05,
                 ]}
-                fontSize={0.18}
+                fontSize={0.18 / Math.sqrt(scale)}
                 color="#dff6ff"
                 anchorX="center"
                 anchorY="middle"
@@ -630,8 +646,8 @@ export function Wheel({
               ref={(material) => {
                 spokeMaterials.current[index] = material;
               }}
-              color="#123a5e"
-              emissive="#1c4f7c"
+              color={theme.spoke}
+              emissive={theme.spokeEmissive}
               emissiveIntensity={0.5}
               transparent
               opacity={0.45}
@@ -686,8 +702,8 @@ export function Wheel({
             ref={(material) => {
               sectorMaterials.current[index] = material;
             }}
-            color="#123a5e"
-            emissive="#1c4f7c"
+            color={theme.sector}
+            emissive={theme.sectorEmissive}
             emissiveIntensity={0.5}
             transparent
             opacity={0.15}
@@ -729,8 +745,8 @@ export function Wheel({
         <cylinderGeometry args={[0.42, 0.42, 0.3, 6]} />
         <meshStandardMaterial
           ref={hubMaterial}
-          color="#0a1a3c"
-          emissive="#2f6690"
+          color={theme.wall}
+          emissive={theme.wallEmissive}
           emissiveIntensity={0.5}
           transparent
           opacity={0.55}
