@@ -64,19 +64,21 @@ export const CAMERA_MOVES = {
   zoomIn: {
     label: "Zoom in",
     speed: DEFAULT_SPEED,
-    amount: { label: "Distance", min: 1, max: 30, step: 1, value: 6 },
+    amount: { label: "Target distance", min: 4, max: 30, step: 1, value: 10 },
+    // Never moves outward, even if the camera is already closer than the target.
     getFinishView: (current, amount) => ({
       ...current,
-      distance: current.distance - amount,
+      distance: Math.min(current.distance, amount),
     }),
   },
   zoomOut: {
     label: "Zoom out",
     speed: DEFAULT_SPEED,
-    amount: { label: "Distance", min: 1, max: 30, step: 1, value: 8 },
+    amount: { label: "Target distance", min: 10, max: 60, step: 1, value: 30 },
+    // Never moves inward, even if the camera is already farther than the target.
     getFinishView: (current, amount) => ({
       ...current,
-      distance: current.distance + amount,
+      distance: Math.max(current.distance, amount),
     }),
   },
   turnLeft: {

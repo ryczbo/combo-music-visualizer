@@ -14,7 +14,6 @@ import {
 
 type PatternBead = {
   spoke: number;
-  startingPosition: "start" | "middle" | "end";
   note: string;
 };
 

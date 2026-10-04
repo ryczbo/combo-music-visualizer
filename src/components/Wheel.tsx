@@ -14,11 +14,8 @@ import {
   type WheelTheme,
 } from "../constants/wheelLayout";
 
-type BeadStartingPosition = "start" | "middle" | "end";
-
 type PatternBead = {
   spoke: number;
-  startingPosition: BeadStartingPosition;
   note: string;
 };
 
@@ -48,6 +45,8 @@ type SpokeBeadProps = {
   spokeAngle: number;
   initialDistance: number;
   note: string;
+  // Inactive beads still move with the wheel but are silent and never light up.
+  active: boolean;
   audioEngine: NotePlayer;
   beadIndex: number;
   suppressSoundsUntil: RefObject<number>;
@@ -86,19 +85,6 @@ const WALL_PROFILE = [
   new THREE.Vector2(WALL_INNER_RADIUS, -WALL_DEPTH / 2),
 ];
 
-function getStartingDistance(
-  startingPosition: BeadStartingPosition,
-  hubRadius: number
-) {
-  if (startingPosition === "start") {
-    return hubRadius + HUB_CONTACT_OFFSET + 0.08;
-  }
-  if (startingPosition === "end") {
-    return SPOKE_START + SPOKE_LENGTH - BEAD_RADIUS - 0.08;
-  }
-  return BEAD_DROP_DISTANCE;
-}
-
 const SPOKE_BEAD_COLOR = new THREE.Color("#f2f7c9");
 const SPOKE_BEAD_EMISSIVE = new THREE.Color("#e8f27a");
 
@@ -107,6 +93,7 @@ function SpokeBead({
   spokeAngle,
   initialDistance,
   note,
+  active,
   audioEngine,
   beadIndex,
   suppressSoundsUntil,
@@ -153,10 +140,12 @@ function SpokeBead({
     const maxDistance = SPOKE_START + SPOKE_LENGTH - BEAD_RADIUS;
     const currentTime = performance.now();
     const hitHub =
+      active &&
       previousDistance > minDistance &&
       distance.current <= minDistance &&
       velocity.current < 0;
     const hitRim =
+      active &&
       previousDistance < maxDistance &&
       distance.current >= maxDistance &&
       velocity.current > 0;
@@ -210,7 +199,7 @@ function SpokeBead({
 
   return (
     <group rotation={[0, 0, spokeAngle]}>
-      <mesh ref={bead} position={[0, initialDistance, 0.22]}>
+      <mesh ref={bead} visible={active} position={[0, initialDistance, 0.22]}>
         <sphereGeometry args={[BEAD_RADIUS, 20, 20]} />
         <meshStandardMaterial
           ref={beadMaterial}
@@ -313,36 +302,19 @@ export function Wheel({
       : scaleNotes[spokeIndex % scaleNotes.length];
   };
 
-  const startingPositionForSpoke = (spokeIndex: number): BeadStartingPosition => {
-    const beadIndex = beadIndexForSpoke(spokeIndex);
-    return beadIndex >= 0 ? beads[beadIndex]?.startingPosition ?? "middle" : "middle";
-  };
-
-  const updateBeadAtSpoke = (
-    spokeIndex: number,
-    update: Partial<PatternBead>
-  ) => {
+  const updateNoteAtSpoke = (spokeIndex: number, note: string) => {
     const beadIndex = beadIndexForSpoke(spokeIndex);
     if (beadIndex >= 0) {
-      const nextBeads = beads.map((bead, index) =>
-        index === beadIndex ? { ...bead, ...update } : bead
+      onBeadNoteChange(
+        beads.map((bead, index) =>
+          index === beadIndex ? { ...bead, note } : bead
+        )
       );
-      if (update.note !== undefined) onBeadNoteChange(nextBeads);
-      else onBeadsChange(nextBeads);
       return;
     }
 
     if (beads.length >= sectionCount) return;
-    const nextBeads = [
-      ...beads,
-      {
-        spoke: spokeIndex,
-        startingPosition: update.startingPosition ?? "middle",
-        note: update.note ?? scaleNotes[spokeIndex % scaleNotes.length],
-      },
-    ];
-    if (update.note !== undefined) onBeadNoteChange(nextBeads);
-    else onBeadsChange(nextBeads);
+    onBeadNoteChange([...beads, { spoke: spokeIndex, note }]);
   };
 
   const sectorAngle = (spokeIndex: number) =>
@@ -365,7 +337,6 @@ export function Wheel({
         ...beads,
         {
           spoke: spokeIndex,
-          startingPosition: "middle",
           note: scaleNotes[spokeIndex % scaleNotes.length],
         },
       ]);
@@ -604,7 +575,7 @@ export function Wheel({
                   autoFocus
                   value={noteForSpoke(editingSector)}
                   onChange={(event) =>
-                    updateBeadAtSpoke(editingSector, { note: event.target.value })
+                    updateNoteAtSpoke(editingSector, event.target.value)
                   }
                   style={{ fontSize: "14px", padding: "4px" }}
                 >
@@ -613,19 +584,6 @@ export function Wheel({
                       {note}
                     </option>
                   ))}
-                </select>
-                <select
-                  value={startingPositionForSpoke(editingSector)}
-                  onChange={(event) =>
-                    updateBeadAtSpoke(editingSector, {
-                      startingPosition: event.target.value as BeadStartingPosition,
-                    })
-                  }
-                  style={{ fontSize: "14px", padding: "4px" }}
-                >
-                  <option value="start">Start</option>
-                  <option value="middle">Middle</option>
-                  <option value="end">End</option>
                 </select>
                 <button onClick={() => setEditingSector(null)}>Done</button>
               </div>
@@ -714,18 +672,16 @@ export function Wheel({
         </mesh>
       ))}
 
-      {beads.map((bead) => {
-        const spokeIndex = bead.spoke;
+      {Array.from({ length: sectionCount }, (_, spokeIndex) => {
+        const bead = beads[beadIndexForSpoke(spokeIndex)];
         return (
           <SpokeBead
             key={spokeIndex}
             wheel={wheel}
             spokeAngle={(spokeIndex / sectionCount) * Math.PI * 2}
-            initialDistance={getStartingDistance(
-              bead.startingPosition,
-              HUB_BASE_RADIUS
-            )}
-            note={bead.note}
+            initialDistance={BEAD_DROP_DISTANCE}
+            note={noteForSpoke(spokeIndex)}
+            active={bead !== undefined}
             audioEngine={audioEngine}
             beadIndex={spokeIndex}
             suppressSoundsUntil={suppressSoundsUntil}

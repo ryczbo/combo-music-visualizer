@@ -1,11 +1,8 @@
 import { SCALES, expandScaleOctaves, type ScaleName } from "./notes";
 import { DRUM_SOUNDS } from "../services/drumEngine";
 
-export type BeadStartingPosition = "start" | "middle" | "end";
-
 export type PatternBead = {
   spoke: number;
-  startingPosition: BeadStartingPosition;
   note: string;
 };
 
@@ -44,10 +41,8 @@ export function createDefaultBead(
   // Overrides the scale's notes, e.g. with drum sounds.
   noteNames: readonly string[] = getScaleNoteNames(scaleName)
 ): PatternBead {
-  const positions: BeadStartingPosition[] = ["start", "middle", "end"];
   return {
     spoke,
-    startingPosition: positions[index % positions.length],
     note: noteNames[index % noteNames.length],
   };
 }
@@ -115,7 +110,6 @@ export function normalizeWheelConfig<T extends WheelConfig>(
         const fallbackNote = createDefaultBead(index, spoke, scaleName, noteNames).note;
         return {
           spoke,
-          startingPosition: bead.startingPosition ?? "middle",
           // Notes saved for a different sound set are replaced.
           note:
             bead.note && (!noteNames || noteNames.includes(bead.note))
