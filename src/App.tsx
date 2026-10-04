@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Scene } from "./components/Scene";
 import { CameraControls } from "./components/CameraControls";
@@ -10,11 +10,16 @@ import type { CameraCommand } from "./constants/cameraMoves";
 import {
   createDefaultDrumConfig,
   createDefaultWheelConfig,
+  createDefaultWheelSound,
   getScaleNoteNames,
   MAX_SECTIONS,
   normalizeWheelConfig,
+  normalizeWheelSound,
+  splitWheelPatch,
   type PatternBead,
   type WheelConfig,
+  type WheelControlValues,
+  type WheelSound,
 } from "./constants/wheelConfig";
 import { useDrumAudio, useWheelAudio } from "./hooks/useWheelAudio";
 
@@ -77,18 +82,18 @@ export default function App() {
   const [cameraCommand, setCameraCommand] = useState<CameraCommand | null>(null);
   // Counts section-width turns completed on the currently playing pattern.
   const sectionsCompletedRef = useRef(0);
-
-  // Lets the camera animation write to whichever pattern is playing now.
-  const activePatternRef = useRef(activePattern);
-
-  useEffect(() => {
-    activePatternRef.current = activePattern;
-  }, [activePattern]);
+  // Sound settings are shared by every pattern; only the camera animations move them.
+  const [sounds, setSounds] = useState<{ blue: WheelSound; pink: WheelSound }>(() => ({
+    blue: createDefaultWheelSound(),
+    pink: createDefaultWheelSound(),
+  }));
 
   const settings = patternSettings[activePattern];
+  const blueControls: WheelControlValues = { ...settings, ...sounds.blue };
+  const pinkControls: WheelControlValues = { ...settings.secondWheel, ...sounds.pink };
 
   const exportSettings = () => {
-    const blob = new Blob([JSON.stringify(patternSettings, null, 2)], {
+    const blob = new Blob([JSON.stringify({ patterns: patternSettings, sounds }, null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
@@ -104,11 +109,20 @@ export default function App() {
   const importSettings = async (file: File) => {
     try {
       const parsed = JSON.parse(await file.text());
-      if (!Array.isArray(parsed) || parsed.length === 0) {
+      // Older exports were a bare array of patterns that each carried sound settings.
+      const patterns = Array.isArray(parsed) ? parsed : parsed?.patterns;
+      if (!Array.isArray(patterns) || patterns.length === 0) {
         throw new Error("Expected a non-empty array of pattern settings.");
       }
+      const savedSounds = Array.isArray(parsed)
+        ? { blue: patterns[0], pink: patterns[0]?.secondWheel }
+        : parsed.sounds;
+      setSounds({
+        blue: normalizeWheelSound(savedSounds?.blue),
+        pink: normalizeWheelSound(savedSounds?.pink),
+      });
       setPatternSettings(
-        parsed.map((pattern) => {
+        patterns.map((pattern) => {
           const defaults = createDefaultWheelSettings();
           const saved = pattern as Partial<WheelSettings> & { beadCount?: number };
           return {
@@ -151,13 +165,19 @@ export default function App() {
     value: WheelSettings[K]
   ) => updatePatternSetting(activePattern, key, value);
 
-  const updateFirstWheel = (patch: Partial<WheelConfig>) =>
-    updatePatternSettings(activePattern, patch);
+  const updateFirstWheel = (patch: Partial<WheelControlValues>) => {
+    const { sound, config } = splitWheelPatch(patch);
+    setSounds((current) => ({ ...current, blue: { ...current.blue, ...sound } }));
+    updatePatternSettings(activePattern, config);
+  };
 
-  const updateSecondWheel = (patch: Partial<WheelConfig>) =>
+  const updateSecondWheel = (patch: Partial<WheelControlValues>) => {
+    const { sound, config } = splitWheelPatch(patch);
+    setSounds((current) => ({ ...current, pink: { ...current.pink, ...sound } }));
     updatePatternSettings(activePattern, {
-      secondWheel: { ...settings.secondWheel, ...patch },
+      secondWheel: { ...settings.secondWheel, ...config },
     });
+  };
 
   const togglePatternActive = (index: number, active: boolean) =>
     updatePatternSetting(index, "active", active);
@@ -233,8 +253,8 @@ export default function App() {
   const updateBeadNote = (beads: PatternBead[]) =>
     updateFirstWheel({ beads, scaleName: "custom", sectorNotes: scaleNotes });
 
-  useWheelAudio(audioEngine, settings);
-  useDrumAudio(drumEngine, settings.secondWheel);
+  useWheelAudio(audioEngine, blueControls);
+  useDrumAudio(drumEngine, sounds.pink);
 
   const noteOptions = Object.keys(SCALES.custom);
   const scaleNotes = settings.sectorNotes ?? getScaleNoteNames(settings.scaleName);
@@ -311,6 +331,8 @@ export default function App() {
         <span style={{ width: "18px", height: "2px", background: "white" }} />
       </button>
 
+      {controlsVisible && (
+      <>
       <button
         onMouseDown={() => setInflateHeld(true)}
         onMouseUp={() => setInflateHeld(false)}
@@ -393,11 +415,16 @@ export default function App() {
       </button>
       <CameraControls
         onCommand={setCameraCommand}
-        getSoundValue={(target) => settings[target]}
+        getSoundValue={(target) => sounds.blue[target]}
         onSoundChange={(target, value) =>
-          updatePatternSetting(activePatternRef.current, target, value)
+          setSounds((current) => ({
+            ...current,
+            blue: { ...current.blue, [target]: value },
+          }))
         }
       />
+      </>
+      )}
       <input
         ref={importInputRef}
         type="file"
@@ -533,7 +560,7 @@ export default function App() {
 
         <WheelControls
           title="Blue wheel controls"
-          config={settings}
+          config={blueControls}
           maxSections={MAX_SECTIONS}
           onChange={updateFirstWheel}
           spin={{
@@ -550,7 +577,7 @@ export default function App() {
         <div style={{ ...panelStyle, left: "290px" }}>
           <WheelControls
             title="Pink wheel controls"
-            config={settings.secondWheel}
+            config={pinkControls}
             maxSections={MAX_SECTIONS}
             noteNames={DRUM_SOUNDS}
             onChange={updateSecondWheel}

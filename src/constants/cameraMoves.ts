@@ -9,7 +9,7 @@ export type CameraView = {
 
 export type CameraMove = {
   label: string;
-  // Higher is faster; roughly 1 / seconds-to-settle.
+  // Transition rate: a move takes 1 / speed seconds, at a constant pace.
   speed: number;
   // The slider that sets the finish position; omit for a move with no options.
   amount?: { label: string; min: number; max: number; step: number; value: number };
@@ -20,7 +20,7 @@ export type CameraMove = {
 export const CAMERA_TARGET: [number, number, number] = [0, 0, 0];
 export const CAMERA_MIN_DISTANCE = 4;
 export const CAMERA_MAX_DISTANCE = 60;
-export const SPEED_RANGE = { min: 0.2, max: 10, step: 0.1 };
+export const SPEED_RANGE = { min: 0.05, max: 5, step: 0.05 };
 
 // Sound controls a camera move can drive; min/max match the sidebar sliders.
 export const MODULATION_TARGETS = {
@@ -49,7 +49,7 @@ export const DEFAULT_MODULATION: CameraModulation = {
   percent: 50,
 };
 
-const DEFAULT_SPEED = 3;
+const DEFAULT_SPEED = 0.5;
 const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
 
 const degrees = (label: string, min: number, max: number, value: number) => ({
@@ -119,7 +119,7 @@ export const CAMERA_MOVES = {
   },
   sideView: {
     label: "Side view",
-    speed: 2,
+    speed: 0.4,
     amount: degrees("Azimuth", -180, 180, 90),
     getFinishView: (current, amount) => ({
       ...current,
@@ -129,8 +129,8 @@ export const CAMERA_MOVES = {
   },
   topView: {
     label: "Top view",
-    speed: 2,
-    amount: degrees("Polar angle", 1, 90, 9),
+    speed: 0.4,
+    amount: degrees("Polar angle", 2, 90, 9),
     getFinishView: (current, amount) => ({
       ...current,
       polar: toRadians(amount),
@@ -138,7 +138,7 @@ export const CAMERA_MOVES = {
   },
   reset: {
     label: "Reset view",
-    speed: 2,
+    speed: 0.4,
     amount: undefined,
     getFinishView: () => ({
       azimuth: 0,

@@ -15,9 +15,8 @@ type CameraRigProps = {
 };
 
 const target = new THREE.Vector3(...CAMERA_TARGET);
-const MIN_POLAR = 0.05;
-const MAX_POLAR = Math.PI - 0.05;
-const SETTLE_THRESHOLD = 0.001;
+const MIN_POLAR = 0.02;
+const MAX_POLAR = Math.PI - 0.02;
 
 function readView(camera: THREE.Camera): CameraView {
   const spherical = new THREE.Spherical().setFromVector3(
@@ -35,11 +34,12 @@ export function CameraRig({ command }: CameraRigProps) {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => state.controls);
   // Tracks the animated view itself: re-reading the camera each frame would wrap
-  // azimuth at +-PI and send the damping the wrong way around.
+  // azimuth at +-PI and break the interpolation.
   const animation = useRef<{
-    current: CameraView;
+    start: CameraView;
     goal: CameraView;
     speeds: CameraView;
+    elapsed: number;
   } | null>(null);
 
   useEffect(() => {
@@ -56,8 +56,9 @@ export function CameraRig({ command }: CameraRigProps) {
       view = finish;
     }
     animation.current = {
-      current: start,
+      start,
       speeds,
+      elapsed: 0,
       goal: {
         azimuth: view.azimuth,
         polar: THREE.MathUtils.clamp(view.polar, MIN_POLAR, MAX_POLAR),
@@ -85,13 +86,15 @@ export function CameraRig({ command }: CameraRigProps) {
     const running = animation.current;
     if (!running) return;
 
-    const { current, goal, speeds } = running;
+    running.elapsed += delta;
+    const { start, goal, speeds } = running;
+    // Constant-rate interpolation that lands exactly on the goal.
+    const progress = (speed: number) => Math.min(1, running.elapsed * speed);
     const next: CameraView = {
-      azimuth: THREE.MathUtils.damp(current.azimuth, goal.azimuth, speeds.azimuth, delta),
-      polar: THREE.MathUtils.damp(current.polar, goal.polar, speeds.polar, delta),
-      distance: THREE.MathUtils.damp(current.distance, goal.distance, speeds.distance, delta),
+      azimuth: THREE.MathUtils.lerp(start.azimuth, goal.azimuth, progress(speeds.azimuth)),
+      polar: THREE.MathUtils.lerp(start.polar, goal.polar, progress(speeds.polar)),
+      distance: THREE.MathUtils.lerp(start.distance, goal.distance, progress(speeds.distance)),
     };
-    running.current = next;
 
     camera.position
       .setFromSpherical(
@@ -100,11 +103,11 @@ export function CameraRig({ command }: CameraRigProps) {
       .add(target);
     camera.lookAt(target);
 
-    const settled =
-      Math.abs(next.azimuth - goal.azimuth) < SETTLE_THRESHOLD &&
-      Math.abs(next.polar - goal.polar) < SETTLE_THRESHOLD &&
-      Math.abs(next.distance - goal.distance) < SETTLE_THRESHOLD;
-    if (settled) animation.current = null;
+    const finished =
+      progress(speeds.azimuth) === 1 &&
+      progress(speeds.polar) === 1 &&
+      progress(speeds.distance) === 1;
+    if (finished) animation.current = null;
   });
 
   return null;

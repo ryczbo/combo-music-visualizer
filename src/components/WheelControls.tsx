@@ -3,14 +3,14 @@ import {
   beadCountPatch,
   scalePatch,
   sectionCountPatch,
-  type WheelConfig,
+  type WheelControlValues,
 } from "../constants/wheelConfig";
 
 type WheelControlsProps = {
   title: string;
-  config: WheelConfig;
+  config: WheelControlValues;
   maxSections: number;
-  onChange: (patch: Partial<WheelConfig>) => void;
+  onChange: (patch: Partial<WheelControlValues>) => void;
   // When set, the wheel plays these sounds (e.g. drums) and only the volume,
   // tone and reverb controls apply.
   noteNames?: readonly string[];

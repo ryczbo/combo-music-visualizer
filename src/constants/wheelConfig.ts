@@ -6,7 +6,7 @@ export type PatternBead = {
   note: string;
 };
 
-// Everything that is configured per wheel; patterns share activeness and length.
+// What a pattern remembers for a wheel; patterns share activeness and length.
 export type WheelConfig = {
   sectionCount: number;
   beads: PatternBead[];
@@ -14,6 +14,11 @@ export type WheelConfig = {
   // Notes pinned for the sectors after a hand edit, so switching to the custom
   // scale doesn't relabel them; cleared whenever a scale is picked.
   sectorNotes?: string[];
+};
+
+// Sound settings belong to the wheel, not to a pattern, so they stay the same
+// while patterns switch; only the camera animations change them on the fly.
+export type WheelSound = {
   volume: number;
   tone: number;
   reverb: number;
@@ -25,6 +30,42 @@ export type WheelConfig = {
   lfoType: OscillatorType;
   lfoRate: number;
 };
+
+export type WheelControlValues = WheelConfig & WheelSound;
+
+export const createDefaultWheelSound = (): WheelSound => ({
+  volume: 0.8,
+  tone: 1,
+  reverb: 0.24,
+  sustain: 0.5,
+  ringModulation: 0,
+  oscillatorType: "sine",
+  filterType: "lowpass",
+  filterFrequency: 12000,
+  lfoType: "sine",
+  lfoRate: 0,
+});
+
+const SOUND_KEYS = Object.keys(createDefaultWheelSound()) as (keyof WheelSound)[];
+
+// Keeps only known sound settings from saved data.
+export function normalizeWheelSound(saved: Partial<WheelSound> = {}): WheelSound {
+  const defaults = createDefaultWheelSound();
+  return Object.fromEntries(
+    SOUND_KEYS.map((key) => [key, saved[key] ?? defaults[key]])
+  ) as WheelSound;
+}
+
+// Separates a control change into the part stored per pattern and the sound part.
+export function splitWheelPatch(patch: Partial<WheelControlValues>) {
+  const sound: Partial<WheelSound> = {};
+  const config: Partial<WheelConfig> = {};
+  for (const [key, value] of Object.entries(patch)) {
+    if ((SOUND_KEYS as string[]).includes(key)) Object.assign(sound, { [key]: value });
+    else Object.assign(config, { [key]: value });
+  }
+  return { sound, config };
+}
 
 export const MAX_SECTIONS = 20;
 
@@ -55,16 +96,6 @@ export function createDefaultWheelConfig(
     sectionCount,
     beads: [createDefaultBead(0, 0, scaleName), createDefaultBead(1, 1, scaleName)],
     scaleName,
-    volume: 0.8,
-    tone: 1,
-    reverb: 0.24,
-    sustain: 0.5,
-    ringModulation: 0,
-    oscillatorType: "sine",
-    filterType: "lowpass",
-    filterFrequency: 12000,
-    lfoType: "sine",
-    lfoRate: 0,
   };
 }
 

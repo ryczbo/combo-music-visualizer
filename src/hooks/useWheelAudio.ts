@@ -2,10 +2,10 @@ import { useEffect } from "react";
 import type { AudioEngine } from "../services/audioEngine";
 import type { DrumEngine } from "../services/drumEngine";
 import { SCALES, expandScaleOctaves } from "../constants/notes";
-import type { WheelConfig } from "../constants/wheelConfig";
+import type { WheelControlValues, WheelSound } from "../constants/wheelConfig";
 
 // Drums only use the volume, tone and reverb settings.
-export function useDrumAudio(engine: DrumEngine, config: WheelConfig) {
+export function useDrumAudio(engine: DrumEngine, config: WheelSound) {
   useEffect(() => engine.setVolume(config.volume), [engine, config.volume]);
   useEffect(() => engine.setTone(config.tone), [engine, config.tone]);
   useEffect(() => engine.setReverb(config.reverb), [engine, config.reverb]);
@@ -13,7 +13,7 @@ export function useDrumAudio(engine: DrumEngine, config: WheelConfig) {
 
 // Re-applies a wheel's audio settings whenever they change, and whenever
 // switching to a pattern that remembers different values.
-export function useWheelAudio(engine: AudioEngine, config: WheelConfig) {
+export function useWheelAudio(engine: AudioEngine, config: WheelControlValues) {
   useEffect(() => engine.setVolume(config.volume), [engine, config.volume]);
   useEffect(() => engine.setTone(config.tone), [engine, config.tone]);
   useEffect(() => engine.setReverb(config.reverb), [engine, config.reverb]);

@@ -83,8 +83,8 @@ export function CameraControls({
     onCommand({ id: commandId.current, steps });
   };
 
-  // Eases each bound control toward its goal with the same exponential curve
-  // the camera rig uses, so both finish together.
+  // Moves each bound control at a constant rate over the same 1 / speed seconds
+  // as the camera, so both finish together.
   const startModulations = (steps: CameraCommand["steps"]) => {
     cancelAnimationFrame(modulationFrame.current);
     const mods = steps.flatMap(({ move, speed }) => {
@@ -96,20 +96,18 @@ export function CameraControls({
         max,
         Math.max(min, from + (direction * percent * (max - min)) / 100)
       );
-      return [{ target, speed, to, value: from, tolerance: (max - min) * 0.001 }];
+      return [{ target, speed, to, from }];
     });
     if (mods.length === 0) return;
 
-    let last = performance.now();
+    const startTime = performance.now();
     const tick = (now: number) => {
-      const delta = Math.min((now - last) / 1000, 0.1);
-      last = now;
+      const elapsed = (now - startTime) / 1000;
       let running = false;
       for (const mod of mods) {
-        mod.value = mod.to + (mod.value - mod.to) * Math.exp(-mod.speed * delta);
-        if (Math.abs(mod.value - mod.to) < mod.tolerance) mod.value = mod.to;
-        else running = true;
-        onSoundChange(mod.target, mod.value);
+        const progress = Math.min(1, elapsed * mod.speed);
+        onSoundChange(mod.target, mod.from + (mod.to - mod.from) * progress);
+        if (progress < 1) running = true;
       }
       if (running) modulationFrame.current = requestAnimationFrame(tick);
     };
@@ -204,7 +202,7 @@ export function CameraControls({
             </label>
 
             <label style={{ display: "block" }}>
-              Speed: {speed.toFixed(1)}
+              Speed: {speed.toFixed(2)}
               <input
                 type="range"
                 {...SPEED_RANGE}
