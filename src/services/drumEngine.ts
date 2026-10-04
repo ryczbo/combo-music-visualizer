@@ -1,4 +1,5 @@
 import type { NotePlayer } from "./notePlayer";
+import { createEqBands } from "./eq";
 
 export const DRUM_SOUNDS = ["Kick", "Snare", "Hihat", "Crash"] as const;
 
@@ -15,6 +16,10 @@ export class DrumEngine implements NotePlayer {
   private masterGain: GainNode | null = null;
 
   private toneFilter: BiquadFilterNode | null = null;
+
+  private eqBands: BiquadFilterNode[] = [];
+
+  private eqGains = [0, 0, 0];
 
   private reverbGain: GainNode | null = null;
 
@@ -41,12 +46,20 @@ export class DrumEngine implements NotePlayer {
     this.reverbGain = context.createGain();
     const convolver = context.createConvolver();
     const limiter = context.createDynamicsCompressor();
+    const output = context.createGain();
+    output.gain.value = 1.5;
+    output.connect(limiter);
+    this.eqBands = createEqBands(context, this.eqGains);
+    this.eqBands.forEach((band, index) => {
+      if (index > 0) this.eqBands[index - 1].connect(band);
+    });
 
-    this.masterGain.connect(this.toneFilter);
-    this.toneFilter.connect(limiter);
+    this.masterGain.connect(this.eqBands[0]);
+    this.eqBands[2].connect(this.toneFilter);
+    this.toneFilter.connect(output);
     this.toneFilter.connect(this.reverbGain);
     this.reverbGain.connect(convolver);
-    convolver.connect(limiter);
+    convolver.connect(output);
     limiter.connect(context.destination);
 
     this.noiseBuffer = this.createNoise(context, NOISE_SECONDS);
@@ -87,6 +100,15 @@ export class DrumEngine implements NotePlayer {
   setTone(value: number) {
     this.tone = value;
     if (this.toneFilter) this.toneFilter.frequency.value = 400 + value * 15600;
+  }
+
+  // Gains are in dB: low shelf, mid peak, high shelf.
+  setEq(low: number, mid: number, high: number) {
+    this.eqGains = [low, mid, high];
+    if (!this.context) return;
+    this.eqBands.forEach((band, index) =>
+      band.gain.setTargetAtTime(this.eqGains[index], this.context!.currentTime, 0.02)
+    );
   }
 
   setReverb(value: number) {

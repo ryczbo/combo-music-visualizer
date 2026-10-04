@@ -1,4 +1,5 @@
 import { NOTE_FREQUENCIES, VOICES_PER_NOTE } from "../constants/notes";
+import { createEqBands } from "./eq";
 
 export class AudioEngine {
   // The context is created lazily from the user's Start/Drop gesture.
@@ -7,6 +8,10 @@ export class AudioEngine {
   private masterGain: GainNode | null = null;
 
   private toneFilter: BiquadFilterNode | null = null;
+
+  private eqBands: BiquadFilterNode[] = [];
+
+  private eqGains = [0, 0, 0];
 
   private filterBaseFrequency = 12000;
 
@@ -63,7 +68,14 @@ export class AudioEngine {
     this.toneFilter.frequency.value = this.filterBaseFrequency;
     this.toneFilter.Q.value = 0.7;
 
-    this.masterGain.connect(this.toneFilter);
+    // Low shelf, mid peak and high shelf, chained ahead of the tone filter.
+    this.eqBands = createEqBands(this.context, this.eqGains);
+    this.eqBands.forEach((band, index) => {
+      if (index > 0) this.eqBands[index - 1].connect(band);
+    });
+
+    this.masterGain.connect(this.eqBands[0]);
+    this.eqBands[2].connect(this.toneFilter);
     this.filterLfo = this.context.createOscillator();
     this.filterLfo.type = this.lfoType;
     this.filterLfo.frequency.value = this.lfoRate;
@@ -114,7 +126,7 @@ export class AudioEngine {
     this.ringModGain.connect(this.compressor);
 
     const makeupGain = this.context.createGain();
-    makeupGain.gain.value = 2.7;
+    makeupGain.gain.value = 4.05;
     this.compressor.connect(makeupGain);
 
     this.limiter = this.context.createDynamicsCompressor();
@@ -135,6 +147,15 @@ export class AudioEngine {
       value,
       this.context.currentTime,
       0.015
+    );
+  }
+
+  // Gains are in dB: low shelf, mid peak, high shelf.
+  setEq(low: number, mid: number, high: number) {
+    this.eqGains = [low, mid, high];
+    if (!this.context) return;
+    this.eqBands.forEach((band, index) =>
+      band.gain.setTargetAtTime(this.eqGains[index], this.context!.currentTime, 0.02)
     );
   }
 

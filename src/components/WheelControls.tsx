@@ -77,6 +77,22 @@ export function WheelControls({
     </label>
   );
 
+  const eqSlider = (label: string, key: "eqLow" | "eqMid" | "eqHigh") => (
+    <label>
+      {label}: {config[key] > 0 ? "+" : ""}
+      {config[key]} dB
+      <input
+        type="range"
+        min={-12}
+        max={12}
+        step={1}
+        value={config[key]}
+        onChange={(event) => onChange({ [key]: Number(event.target.value) })}
+        style={fullWidth}
+      />
+    </label>
+  );
+
   const waveformSelect = (label: string, key: "oscillatorType" | "lfoType") => (
     <label>
       {label}
@@ -179,6 +195,9 @@ export function WheelControls({
       {percentSlider("Volume", "volume")}
       {percentSlider("Tone", "tone")}
       {percentSlider("Reverb", "reverb")}
+      {eqSlider("Lows", "eqLow")}
+      {eqSlider("Mids", "eqMid")}
+      {eqSlider("Trebles", "eqHigh")}
       {noteNames ? null : (
         <>
           {percentSlider("Sustain", "sustain")}

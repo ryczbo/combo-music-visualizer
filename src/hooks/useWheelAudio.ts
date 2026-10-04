@@ -9,6 +9,10 @@ export function useDrumAudio(engine: DrumEngine, config: WheelSound) {
   useEffect(() => engine.setVolume(config.volume), [engine, config.volume]);
   useEffect(() => engine.setTone(config.tone), [engine, config.tone]);
   useEffect(() => engine.setReverb(config.reverb), [engine, config.reverb]);
+  useEffect(
+    () => engine.setEq(config.eqLow, config.eqMid, config.eqHigh),
+    [engine, config.eqLow, config.eqMid, config.eqHigh]
+  );
 }
 
 // Re-applies a wheel's audio settings whenever they change, and whenever
@@ -18,6 +22,10 @@ export function useWheelAudio(engine: AudioEngine, config: WheelControlValues) {
   useEffect(() => engine.setTone(config.tone), [engine, config.tone]);
   useEffect(() => engine.setReverb(config.reverb), [engine, config.reverb]);
   useEffect(() => engine.setSustain(config.sustain), [engine, config.sustain]);
+  useEffect(
+    () => engine.setEq(config.eqLow, config.eqMid, config.eqHigh),
+    [engine, config.eqLow, config.eqMid, config.eqHigh]
+  );
   useEffect(
     () => engine.setRingModulation(config.ringModulation),
     [engine, config.ringModulation]

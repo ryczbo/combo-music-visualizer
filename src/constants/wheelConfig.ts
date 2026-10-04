@@ -22,6 +22,10 @@ export type WheelSound = {
   volume: number;
   tone: number;
   reverb: number;
+  // EQ band gains in dB.
+  eqLow: number;
+  eqMid: number;
+  eqHigh: number;
   sustain: number;
   ringModulation: number;
   oscillatorType: OscillatorType;
@@ -37,6 +41,9 @@ export const createDefaultWheelSound = (): WheelSound => ({
   volume: 0.8,
   tone: 1,
   reverb: 0.24,
+  eqLow: 0,
+  eqMid: 0,
+  eqHigh: 0,
   sustain: 0.5,
   ringModulation: 0,
   oscillatorType: "sine",
