@@ -61,7 +61,16 @@ export function WheelControls({
 }: WheelControlsProps) {
   const percentSlider = (
     label: string,
-    key: "volume" | "tone" | "reverb" | "sustain" | "ringModulation"
+    key:
+      | "volume"
+      | "tone"
+      | "reverb"
+      | "sustain"
+      | "ringModulation"
+      | "saturation"
+      | "compression"
+      | "limiterDrive"
+      | "masterVolume"
   ) => (
     <label>
       {label}: {Math.round(config[key] * 100)}%
@@ -198,6 +207,10 @@ export function WheelControls({
       {eqSlider("Lows", "eqLow")}
       {eqSlider("Mids", "eqMid")}
       {eqSlider("Trebles", "eqHigh")}
+      {percentSlider("Saturation", "saturation")}
+      {percentSlider("Compressor", "compression")}
+      {percentSlider("Limiter drive", "limiterDrive")}
+      {percentSlider("Master volume", "masterVolume")}
       {noteNames ? null : (
         <>
           {percentSlider("Sustain", "sustain")}

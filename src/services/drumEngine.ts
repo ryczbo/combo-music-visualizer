@@ -1,5 +1,6 @@
 import type { NotePlayer } from "./notePlayer";
 import { createEqBands } from "./eq";
+import { MasterBus, Saturator } from "./mastering";
 
 export const DRUM_SOUNDS = ["Kick", "Snare", "Hihat", "Crash"] as const;
 
@@ -20,6 +21,17 @@ export class DrumEngine implements NotePlayer {
   private eqBands: BiquadFilterNode[] = [];
 
   private eqGains = [0, 0, 0];
+
+  private masterBus: MasterBus | null = null;
+
+  private saturator: Saturator | null = null;
+
+  private mastering = {
+    saturation: 0,
+    compression: 0.5,
+    limiterDrive: 0.5,
+    masterVolume: 1,
+  };
 
   private reverbGain: GainNode | null = null;
 
@@ -45,23 +57,21 @@ export class DrumEngine implements NotePlayer {
     this.toneFilter.type = "lowpass";
     this.reverbGain = context.createGain();
     const convolver = context.createConvolver();
-    const limiter = context.createDynamicsCompressor();
-    const output = context.createGain();
-    output.gain.value = 1.5;
-    output.connect(limiter);
+    this.masterBus = new MasterBus(context, this.mastering);
+    const busInput = this.masterBus.input;
     this.eqBands = createEqBands(context, this.eqGains);
     this.eqBands.forEach((band, index) => {
       if (index > 0) this.eqBands[index - 1].connect(band);
     });
 
+    this.saturator = new Saturator(context, this.mastering.saturation);
     this.masterGain.connect(this.eqBands[0]);
-    this.eqBands[2].connect(this.toneFilter);
-    this.toneFilter.connect(output);
+    this.eqBands[2].connect(this.saturator.input);
+    this.saturator.output.connect(this.toneFilter);
+    this.toneFilter.connect(busInput);
     this.toneFilter.connect(this.reverbGain);
     this.reverbGain.connect(convolver);
-    convolver.connect(output);
-    limiter.connect(context.destination);
-
+    convolver.connect(busInput);
     this.noiseBuffer = this.createNoise(context, NOISE_SECONDS);
     convolver.buffer = this.createImpulse(context);
     this.setVolume(this.volume);
@@ -109,6 +119,26 @@ export class DrumEngine implements NotePlayer {
     this.eqBands.forEach((band, index) =>
       band.gain.setTargetAtTime(this.eqGains[index], this.context!.currentTime, 0.02)
     );
+  }
+
+  setSaturation(value: number) {
+    this.mastering.saturation = value;
+    if (this.context) this.saturator?.setAmount(value, this.context);
+  }
+
+  setCompression(value: number) {
+    this.mastering.compression = value;
+    this.masterBus?.setCompression(value);
+  }
+
+  setLimiterDrive(value: number) {
+    this.mastering.limiterDrive = value;
+    this.masterBus?.setLimiterDrive(value);
+  }
+
+  setMasterVolume(value: number) {
+    this.mastering.masterVolume = value;
+    this.masterBus?.setMasterVolume(value);
   }
 
   setReverb(value: number) {

@@ -4,7 +4,7 @@ import type { DrumEngine } from "../services/drumEngine";
 import { SCALES, expandScaleOctaves } from "../constants/notes";
 import type { WheelControlValues, WheelSound } from "../constants/wheelConfig";
 
-// Drums only use the volume, tone and reverb settings.
+// Drums only use the volume, tone, reverb, EQ and mastering settings.
 export function useDrumAudio(engine: DrumEngine, config: WheelSound) {
   useEffect(() => engine.setVolume(config.volume), [engine, config.volume]);
   useEffect(() => engine.setTone(config.tone), [engine, config.tone]);
@@ -12,6 +12,31 @@ export function useDrumAudio(engine: DrumEngine, config: WheelSound) {
   useEffect(
     () => engine.setEq(config.eqLow, config.eqMid, config.eqHigh),
     [engine, config.eqLow, config.eqMid, config.eqHigh]
+  );
+  useMasteringAudio(engine, config);
+}
+
+type MasteringEngine = Pick<
+  AudioEngine,
+  "setSaturation" | "setCompression" | "setLimiterDrive" | "setMasterVolume"
+>;
+
+function useMasteringAudio(engine: MasteringEngine, config: WheelSound) {
+  useEffect(
+    () => engine.setSaturation(config.saturation),
+    [engine, config.saturation]
+  );
+  useEffect(
+    () => engine.setCompression(config.compression),
+    [engine, config.compression]
+  );
+  useEffect(
+    () => engine.setLimiterDrive(config.limiterDrive),
+    [engine, config.limiterDrive]
+  );
+  useEffect(
+    () => engine.setMasterVolume(config.masterVolume),
+    [engine, config.masterVolume]
   );
 }
 
@@ -22,6 +47,7 @@ export function useWheelAudio(engine: AudioEngine, config: WheelControlValues) {
   useEffect(() => engine.setTone(config.tone), [engine, config.tone]);
   useEffect(() => engine.setReverb(config.reverb), [engine, config.reverb]);
   useEffect(() => engine.setSustain(config.sustain), [engine, config.sustain]);
+  useMasteringAudio(engine, config);
   useEffect(
     () => engine.setEq(config.eqLow, config.eqMid, config.eqHigh),
     [engine, config.eqLow, config.eqMid, config.eqHigh]

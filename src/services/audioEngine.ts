@@ -1,5 +1,6 @@
 import { NOTE_FREQUENCIES, VOICES_PER_NOTE } from "../constants/notes";
 import { createEqBands } from "./eq";
+import { MasterBus, Saturator } from "./mastering";
 
 export class AudioEngine {
   // The context is created lazily from the user's Start/Drop gesture.
@@ -39,9 +40,16 @@ export class AudioEngine {
 
   private lfoRate = 0;
 
-  private compressor: DynamicsCompressorNode | null = null;
+  private masterBus: MasterBus | null = null;
 
-  private limiter: DynamicsCompressorNode | null = null;
+  private saturator: Saturator | null = null;
+
+  private mastering = {
+    saturation: 0,
+    compression: 0.5,
+    limiterDrive: 0.5,
+    masterVolume: 1,
+  };
 
   private voices = new Map<
     string,
@@ -59,8 +67,8 @@ export class AudioEngine {
     // events rather than a long-form music stream.
     this.context = new AudioContext({ latencyHint: "interactive" });
 
-    // Route all voices through a gain stage, compressor, makeup gain, and final
-    // limiter so many simultaneous impacts remain loud without clipping.
+    // Route all voices through EQ, saturation, a compressor and a brick-wall
+    // limiter so many simultaneous impacts stay loud without clipping.
     this.masterGain = this.context.createGain();
     this.masterGain.gain.value = 0.8;
     this.toneFilter = this.context.createBiquadFilter();
@@ -75,7 +83,9 @@ export class AudioEngine {
     });
 
     this.masterGain.connect(this.eqBands[0]);
-    this.eqBands[2].connect(this.toneFilter);
+    this.saturator = new Saturator(this.context, this.mastering.saturation);
+    this.eqBands[2].connect(this.saturator.input);
+    this.saturator.output.connect(this.toneFilter);
     this.filterLfo = this.context.createOscillator();
     this.filterLfo.type = this.lfoType;
     this.filterLfo.frequency.value = this.lfoRate;
@@ -84,13 +94,9 @@ export class AudioEngine {
     this.filterLfo.connect(this.filterLfoDepth);
     this.filterLfoDepth.connect(this.toneFilter.frequency);
     this.filterLfo.start();
-    this.compressor = this.context.createDynamicsCompressor();
-    this.compressor.threshold.value = -10;
-    this.compressor.knee.value = 10;
-    this.compressor.ratio.value = 20;
-    this.compressor.attack.value = 0.003;
-    this.compressor.release.value = 0.12;
-    this.toneFilter.connect(this.compressor);
+    this.masterBus = new MasterBus(this.context, this.mastering);
+    const busInput = this.masterBus.input;
+    this.toneFilter.connect(busInput);
 
     const convolver = this.context.createConvolver();
     const impulseLength = this.context.sampleRate * 2.2;
@@ -111,7 +117,7 @@ export class AudioEngine {
     this.reverbGain.gain.value = 0.12;
     this.toneFilter.connect(convolver);
     convolver.connect(this.reverbGain);
-    this.reverbGain.connect(this.compressor);
+    this.reverbGain.connect(busInput);
 
     this.ringModGain = this.context.createGain();
     this.ringModGain.gain.value = 0;
@@ -123,20 +129,7 @@ export class AudioEngine {
     this.ringModDepth.connect(this.ringModGain.gain);
     this.ringModOscillator.start();
     this.toneFilter.connect(this.ringModGain);
-    this.ringModGain.connect(this.compressor);
-
-    const makeupGain = this.context.createGain();
-    makeupGain.gain.value = 4.05;
-    this.compressor.connect(makeupGain);
-
-    this.limiter = this.context.createDynamicsCompressor();
-    this.limiter.threshold.value = -2;
-    this.limiter.knee.value = 0;
-    this.limiter.ratio.value = 20;
-    this.limiter.attack.value = 0.001;
-    this.limiter.release.value = 0.08;
-    makeupGain.connect(this.limiter);
-    this.limiter.connect(this.context.destination);
+    this.ringModGain.connect(busInput);
 
     this.initialized = true;
   }
@@ -157,6 +150,26 @@ export class AudioEngine {
     this.eqBands.forEach((band, index) =>
       band.gain.setTargetAtTime(this.eqGains[index], this.context!.currentTime, 0.02)
     );
+  }
+
+  setSaturation(value: number) {
+    this.mastering.saturation = value;
+    if (this.context) this.saturator?.setAmount(value, this.context);
+  }
+
+  setCompression(value: number) {
+    this.mastering.compression = value;
+    this.masterBus?.setCompression(value);
+  }
+
+  setLimiterDrive(value: number) {
+    this.mastering.limiterDrive = value;
+    this.masterBus?.setLimiterDrive(value);
+  }
+
+  setMasterVolume(value: number) {
+    this.mastering.masterVolume = value;
+    this.masterBus?.setMasterVolume(value);
   }
 
   setTone(value: number) {

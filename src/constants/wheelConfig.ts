@@ -26,6 +26,12 @@ export type WheelSound = {
   eqLow: number;
   eqMid: number;
   eqHigh: number;
+  saturation: number;
+  compression: number;
+  // Pushes the signal into the limiter for loudness without clipping.
+  limiterDrive: number;
+  // Final level after the limiter; it can only turn the output down.
+  masterVolume: number;
   sustain: number;
   ringModulation: number;
   oscillatorType: OscillatorType;
@@ -44,6 +50,10 @@ export const createDefaultWheelSound = (): WheelSound => ({
   eqLow: 0,
   eqMid: 0,
   eqHigh: 0,
+  saturation: 0,
+  compression: 0.5,
+  limiterDrive: 0.5,
+  masterVolume: 1,
   sustain: 0.5,
   ringModulation: 0,
   oscillatorType: "sine",
