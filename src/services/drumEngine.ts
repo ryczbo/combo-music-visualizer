@@ -185,32 +185,32 @@ export class DrumEngine implements NotePlayer {
     oscillator.stop(start + 0.5);
   }
 
-  private playSnare(context: AudioContext, start: number, level: number) {
-    const body = context.createOscillator();
-    body.type = "triangle";
-    body.frequency.setValueAtTime(190, start);
-    body.connect(this.envelope(context, start, level * 0.6, 0.12));
-    body.start(start);
-    body.stop(start + 0.15);
+  // private playSnare(context: AudioContext, start: number, level: number) {
+  //   const body = context.createOscillator();
+  //   body.type = "triangle";
+  //   body.frequency.setValueAtTime(190, start);
+  //   body.connect(this.envelope(context, start, level * 0.6, 0.12));
+  //   body.start(start);
+  //   body.stop(start + 0.15);
 
-    this.playNoise(context, start, level * 0.8, 1500, 0.2);
-  }
+  //   this.playNoise(context, start, level * 0.8, 1500, 0.2);
+  // }
 
-  private playNoise(
-    context: AudioContext,
-    start: number,
-    level: number,
-    highpass: number,
-    length: number
-  ) {
-    const source = context.createBufferSource();
-    source.buffer = this.noiseBuffer;
-    const filter = context.createBiquadFilter();
-    filter.type = "highpass";
-    filter.frequency.value = highpass;
-    source.connect(filter);
-    filter.connect(this.envelope(context, start, level, length));
-    source.start(start);
-    source.stop(start + length + 0.05);
-  }
+  // private playNoise(
+  //   context: AudioContext,
+  //   start: number,
+  //   level: number,
+  //   highpass: number,
+  //   length: number
+  // ) {
+  //   const source = context.createBufferSource();
+  //   source.buffer = this.noiseBuffer;
+  //   const filter = context.createBiquadFilter();
+  //   filter.type = "highpass";
+  //   filter.frequency.value = highpass;
+  //   source.connect(filter);
+  //   filter.connect(this.envelope(context, start, level, length));
+  //   source.start(start);
+  //   source.stop(start + length + 0.05);
+  // }
 }
