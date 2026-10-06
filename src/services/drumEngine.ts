@@ -176,14 +176,14 @@ export class DrumEngine implements NotePlayer {
     return gain;
   }
 
-  private playKick(context: AudioContext, start: number, level: number) {
-    const oscillator = context.createOscillator();
-    oscillator.frequency.setValueAtTime(160, start);
-    oscillator.frequency.exponentialRampToValueAtTime(42, start + 0.12);
-    oscillator.connect(this.envelope(context, start, level, 0.45));
-    oscillator.start(start);
-    oscillator.stop(start + 0.5);
-  }
+  // private playKick(context: AudioContext, start: number, level: number) {
+  //   const oscillator = context.createOscillator();
+  //   oscillator.frequency.setValueAtTime(160, start);
+  //   oscillator.frequency.exponentialRampToValueAtTime(42, start + 0.12);
+  //   oscillator.connect(this.envelope(context, start, level, 0.45));
+  //   oscillator.start(start);
+  //   oscillator.stop(start + 0.5);
+  // }
 
   // private playSnare(context: AudioContext, start: number, level: number) {
   //   const body = context.createOscillator();
