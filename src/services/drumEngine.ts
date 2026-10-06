@@ -6,7 +6,7 @@ export const DRUM_SOUNDS = ["Kick", "Snare", "Hihat", "Crash"] as const;
 
 export type DrumSound = (typeof DRUM_SOUNDS)[number];
 
-// const NOISE_SECONDS = 2;
+const NOISE_SECONDS = 2;
 const REVERB_SECONDS = 1.6;
 
 // Synthesized percussion with its own output chain, so it can sit next to the
@@ -35,7 +35,7 @@ export class DrumEngine implements NotePlayer {
 
   private reverbGain: GainNode | null = null;
 
-  // private noiseBuffer: AudioBuffer | null = null;
+  private noiseBuffer: AudioBuffer | null = null;
 
   private volume = 0.8;
 
@@ -72,7 +72,7 @@ export class DrumEngine implements NotePlayer {
     this.toneFilter.connect(this.reverbGain);
     this.reverbGain.connect(convolver);
     convolver.connect(busInput);
-    // this.noiseBuffer = this.createNoise(context, NOISE_SECONDS);
+    this.noiseBuffer = this.createNoise(context, NOISE_SECONDS);
     convolver.buffer = this.createImpulse(context);
     this.setVolume(this.volume);
     this.setTone(this.tone);
@@ -154,16 +154,16 @@ export class DrumEngine implements NotePlayer {
     const now = context.currentTime;
     switch (note) {
       case "Kick":
-        this.playKick(context, now, level);
+        this.playNoise(context, now, level * 0.6, 7000, 0.06);
         break;
       case "Snare":
-       this.playKick(context, now, level);
+       this.playNoise(context, now, level * 0.6, 7000, 0.06);
         break;
       case "Hihat":
-       this.playKick(context, now, level);
+       this.playNoise(context, now, level * 0.6, 7000, 0.06);
         break;
       case "Crash":
-        this.playKick(context, now, level);
+        this.playNoise(context, now, level * 0.6, 7000, 0.06);
         break;
     }
   }
@@ -196,21 +196,21 @@ export class DrumEngine implements NotePlayer {
   //   this.playNoise(context, start, level * 0.8, 1500, 0.2);
   // }
 
-  // private playNoise(
-  //   context: AudioContext,
-  //   start: number,
-  //   level: number,
-  //   highpass: number,
-  //   length: number
-  // ) {
-  //   const source = context.createBufferSource();
-  //   source.buffer = this.noiseBuffer;
-  //   const filter = context.createBiquadFilter();
-  //   filter.type = "highpass";
-  //   filter.frequency.value = highpass;
-  //   source.connect(filter);
-  //   filter.connect(this.envelope(context, start, level, length));
-  //   source.start(start);
-  //   source.stop(start + length + 0.05);
-  // }
+  private playNoise(
+    context: AudioContext,
+    start: number,
+    level: number,
+    highpass: number,
+    length: number
+  ) {
+    const source = context.createBufferSource();
+    source.buffer = this.noiseBuffer;
+    const filter = context.createBiquadFilter();
+    filter.type = "highpass";
+    filter.frequency.value = highpass;
+    source.connect(filter);
+    filter.connect(this.envelope(context, start, level, length));
+    source.start(start);
+    source.stop(start + length + 0.05);
+  }
 }
