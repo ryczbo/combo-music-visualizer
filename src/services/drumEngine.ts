@@ -157,13 +157,13 @@ export class DrumEngine implements NotePlayer {
         this.playKick(context, now, level);
         break;
       case "Snare":
-        this.playSnare(context, now, level);
+       this.playKick(context, now, level);
         break;
       case "Hihat":
-        this.playNoise(context, now, level * 0.6, 7000, 0.06);
+       this.playKick(context, now, level);
         break;
       case "Crash":
-        this.playNoise(context, now, level * 0.7, 4500, 1.4);
+        this.playKick(context, now, level);
         break;
     }
   }

@@ -21,6 +21,8 @@ type SecondWheelProps = {
   noteOptions: string[];
   scaleNotes: string[];
   sectionCount: number;
+  beadBounciness: number;
+  beadWeight: number;
   beads: PatternBead[];
   onBeadsChange: (beads: PatternBead[]) => void;
   onBeadNoteChange: (beads: PatternBead[]) => void;
@@ -36,6 +38,8 @@ type SceneProps = {
   inflateHeld: boolean;
   showOuterRing: boolean;
   sectionCount: number;
+  beadBounciness: number;
+  beadWeight: number;
   beads: PatternBead[];
   onBeadsChange: (beads: PatternBead[]) => void;
   onBeadNoteChange: (beads: PatternBead[]) => void;
@@ -57,6 +61,8 @@ export function Scene({
   inflateHeld,
   showOuterRing,
   sectionCount,
+  beadBounciness,
+  beadWeight,
   beads,
   onBeadsChange,
   onBeadNoteChange,
@@ -90,6 +96,8 @@ export function Scene({
         inflateHeld={inflateHeld}
         showOuterRing={showOuterRing}
         sectionCount={sectionCount}
+        beadBounciness={beadBounciness}
+        beadWeight={beadWeight}
         beads={beads}
         onBeadsChange={onBeadsChange}
         onBeadNoteChange={onBeadNoteChange}
@@ -109,6 +117,8 @@ export function Scene({
           inflateHeld={inflateHeld}
           showOuterRing={showOuterRing}
           sectionCount={secondWheel.sectionCount}
+          beadBounciness={secondWheel.beadBounciness}
+          beadWeight={secondWheel.beadWeight}
           beads={secondWheel.beads}
           onBeadsChange={secondWheel.onBeadsChange}
           onBeadNoteChange={secondWheel.onBeadNoteChange}

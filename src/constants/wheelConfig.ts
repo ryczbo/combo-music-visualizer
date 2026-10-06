@@ -11,6 +11,8 @@ export type WheelConfig = {
   sectionCount: number;
   beads: PatternBead[];
   scaleName: ScaleName;
+  beadBounciness: number;
+  beadWeight: number;
   // Notes pinned for the sectors after a hand edit, so switching to the custom
   // scale doesn't relabel them; cleared whenever a scale is picked.
   sectorNotes?: string[];
@@ -113,6 +115,8 @@ export function createDefaultWheelConfig(
     sectionCount,
     beads: [createDefaultBead(0, 0, scaleName), createDefaultBead(1, 1, scaleName)],
     scaleName,
+    beadBounciness: 0.45,
+    beadWeight: 1,
   };
 }
 

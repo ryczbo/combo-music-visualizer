@@ -288,6 +288,8 @@ export default function App() {
           inflateHeld={inflateHeld}
           showOuterRing={showOuterRing}
           sectionCount={settings.sectionCount}
+          beadBounciness={settings.beadBounciness}
+          beadWeight={settings.beadWeight}
           beads={settings.beads}
           onBeadsChange={updateBeads}
           onBeadNoteChange={updateBeadNote}
@@ -302,6 +304,8 @@ export default function App() {
                   noteOptions: [...DRUM_SOUNDS],
                   scaleNotes: [...DRUM_SOUNDS],
                   sectionCount: settings.secondWheel.sectionCount,
+                  beadBounciness: settings.secondWheel.beadBounciness,
+                  beadWeight: settings.secondWheel.beadWeight,
                   beads: settings.secondWheel.beads,
                   onBeadsChange: (beads) => updateSecondWheel({ beads }),
                   onBeadNoteChange: (beads) => updateSecondWheel({ beads }),

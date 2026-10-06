@@ -152,6 +152,38 @@ export function WheelControls({
           style={fullWidth}
         />
       </label>
+      {noteNames && (
+        <>
+          <label>
+            Bounciness: {Math.round(config.beadBounciness * 100)}%
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={config.beadBounciness}
+              onChange={(event) =>
+                onChange({ beadBounciness: Number(event.target.value) })
+              }
+              style={fullWidth}
+            />
+          </label>
+          <label>
+            Weight: {config.beadWeight.toFixed(2)}×
+            <input
+              type="range"
+              min={0.25}
+              max={2.5}
+              step={0.05}
+              value={config.beadWeight}
+              onChange={(event) =>
+                onChange({ beadWeight: Number(event.target.value) })
+              }
+              style={fullWidth}
+            />
+          </label>
+        </>
+      )}
       {spin && (
         <div style={{ display: "grid", gap: "6px" }}>
           <div style={{ display: "flex", gap: "6px" }}>

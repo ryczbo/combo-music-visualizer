@@ -29,6 +29,8 @@ type WheelProps = {
   inflateHeld: boolean;
   showOuterRing: boolean;
   sectionCount: number;
+  beadBounciness: number;
+  beadWeight: number;
   beads: PatternBead[];
   onBeadsChange: (beads: PatternBead[]) => void;
   onBeadNoteChange: (beads: PatternBead[]) => void;
@@ -45,6 +47,8 @@ type SpokeBeadProps = {
   wheel: RefObject<THREE.Group | null>;
   spokeAngle: number;
   initialDistance: number;
+  bounciness: number;
+  weight: number;
   note: string;
   color: string;
   // Inactive beads still move with the wheel but are silent and never light up.
@@ -92,6 +96,8 @@ function SpokeBead({
   wheel,
   spokeAngle,
   initialDistance,
+  bounciness,
+  weight,
   note,
   color,
   active,
@@ -122,9 +128,9 @@ function SpokeBead({
     const radialDirection = new THREE.Vector3(0, 1, 0)
       .applyAxisAngle(new THREE.Vector3(0, 0, 1), spokeAngle)
       .applyQuaternion(wheel.current?.quaternion ?? new THREE.Quaternion());
-    const gravity = new THREE.Vector3(0, -9.81, 0);
+    const gravity = new THREE.Vector3(0, -9.81 * weight, 0);
     velocity.current += gravity.dot(radialDirection) * delta;
-    velocity.current *= Math.exp(-1.8 * delta);
+    velocity.current *= Math.exp((-1.8 / weight) * delta);
     const previousDistance = distance.current;
     distance.current += velocity.current * delta;
     const collisionState = onStateChange(
@@ -158,7 +164,7 @@ function SpokeBead({
         hubPhase.current === "inflating"
           ? (hubRadius.current / HUB_BASE_RADIUS - 1) * HUB_PUSH_STRENGTH
           : 0;
-      velocity.current = Math.abs(velocity.current) * 0.45 + inflatePush;
+      velocity.current = Math.abs(velocity.current) * bounciness + inflatePush;
       if (hitHub) {
         onHubHit();
         beadFlash.current = 1;
@@ -173,7 +179,7 @@ function SpokeBead({
       }
     } else if (distance.current > maxDistance) {
       distance.current = maxDistance;
-      velocity.current = -Math.abs(velocity.current) * 0.45;
+      velocity.current = -Math.abs(velocity.current) * bounciness;
       if (hitRim) {
         onRimHit();
         beadFlash.current = 1;
@@ -227,6 +233,8 @@ export function Wheel({
   inflateHeld,
   showOuterRing,
   sectionCount,
+  beadBounciness,
+  beadWeight,
   beads,
   onBeadsChange,
   onBeadNoteChange,
@@ -690,6 +698,8 @@ export function Wheel({
             wheel={wheel}
             spokeAngle={(spokeIndex / sectionCount) * Math.PI * 2}
             initialDistance={BEAD_DROP_DISTANCE}
+            bounciness={beadBounciness}
+            weight={beadWeight}
             note={noteForSpoke(spokeIndex)}
             color={beadColor}
             active={bead !== undefined}
